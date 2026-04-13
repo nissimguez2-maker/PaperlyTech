@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ── Custom Paperly Theme ── */
+/*  Custom Paperly Theme  */
 @theme {
   --color-cream: #F9F8F6;
   --color-cream-dark: #EFE9E3;
@@ -22,7 +22,7 @@
   --font-body: "DM Sans", system-ui, sans-serif;
 }
 
-/* ── Base ── */
+/*  Base  */
 body {
   font-family: var(--font-body);
   background: var(--color-cream);
@@ -31,19 +31,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Scrollbar ── */
+/*  Scrollbar  */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--color-cream-dark); }
 ::-webkit-scrollbar-thumb { background: var(--color-sand); border-radius: 3px; }
 
-/* ── Focus ring ── */
+/*  Focus ring  */
 *:focus-visible {
   outline: 2px solid var(--color-gold-dark);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
-/* ── Headings ── */
+/*  Headings  */
 h1, h2, h3 {
   font-family: var(--font-display);
 }
