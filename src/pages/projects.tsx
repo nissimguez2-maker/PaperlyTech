@@ -4,11 +4,9 @@ import {
   Plus, Search, Filter, CalendarDays, ChevronRight,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
-import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { PipelineBadge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Input } from '@/components/ui/input'
 import { fmtCurrency, fmtDate, cn, PIPELINE_STAGES } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import type { Project, PipelineStage, Quote, Payment } from '@/types/database'
@@ -45,7 +43,7 @@ export function ProjectsPage() {
           total,
           paid,
           remaining: Math.max(0, total - paid),
-          clientName: (p.client as { name: string } | null)?.name ?? '—',
+          clientName: (p.client as { name: string } | null)?.name ?? '-',
           quotes: undefined,
           payments: undefined,
         } as ProjectWithFinance

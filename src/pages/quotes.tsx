@@ -6,10 +6,9 @@ import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
 import { uid, fmtCurrency, safeFloat, cn } from '@/lib/utils'
-import type { Category, Article, QuoteItem } from '@/types/database'
+import type { Category, Article } from '@/types/database'
 
 interface QuoteItemLocal {
   id: string
@@ -53,7 +52,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         arts.forEach(art => {
           result.push({
             value: art.id,
-            label: `${parent.name} › ${sub.name} › ${art.name}`,
+            label: `${parent.name} > ${sub.name} > ${art.name}`,
           })
         })
       })
@@ -314,7 +313,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                       discMode === 'fixed' ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream',
                     )}
                   >
-                    ₪
+                    NIS 
                   </button>
                 </div>
                 <input

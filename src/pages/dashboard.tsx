@@ -155,7 +155,7 @@ export function DashboardPage() {
                   <div className="flex items-center gap-4">
                     <div>
                       <p className="text-sm font-medium text-bark">{p.name}</p>
-                      <p className="text-xs text-muted">{(p as Record<string, unknown>).client ? ((p as Record<string, unknown>).client as { name: string }).name : '—'}</p>
+                      <p className="text-xs text-muted">{(p as unknown as Record<string, unknown>).client ? ((p as unknown as Record<string, unknown>).client as { name: string }).name : '-'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">

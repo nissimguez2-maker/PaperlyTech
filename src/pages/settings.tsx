@@ -18,7 +18,7 @@ export function SettingsPage() {
             <Input label="Studio Name" defaultValue="Paperly" />
             <Input label="Contact Email" defaultValue={user?.email ?? ''} />
             <Input label="Phone" placeholder="+972 ..." />
-            <Input label="Currency" defaultValue="₪ (ILS)" disabled />
+            <Input label="Currency" defaultValue="NIS  (ILS)" disabled />
           </div>
           <div className="mt-4 flex justify-end">
             <Button variant="primary">Save Changes</Button>

@@ -7,11 +7,11 @@ export function uid(): string {
 
 /** Format date for display: "13 April 2026" */
 export function fmtDate(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   try {
     return format(parseISO(iso), 'd MMMM yyyy')
   } catch {
-    return '—'
+    return '-'
   }
 }
 
@@ -27,7 +27,7 @@ export function fmtMonth(iso: string | null): string {
 
 /** Format currency in ILS */
 export function fmtCurrency(amount: number): string {
-  return `₪${amount.toLocaleString('en-IL', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+  return `NIS ${amount.toLocaleString('en-IL', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
 
 /** Safe parseFloat with fallback */
