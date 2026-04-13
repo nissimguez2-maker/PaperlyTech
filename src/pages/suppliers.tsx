@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useToast } from '@/components/ui/toast'
-import { fmtCurrency, uid } from '@/lib/utils'
+import { fmtCurrency } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import type { Supplier } from '@/types/database'
 
@@ -32,31 +32,33 @@ export function SuppliersPage() {
       toast('Enter a name', 'error')
       return
     }
-    const newSupplier: Supplier = {
-      id: uid(),
+
+    const { data: saved, error } = await supabase.from('suppliers').insert({
       name: form.name.trim(),
       contact: form.contact || null,
       notes: form.notes || null,
       offerings: [],
-      created_at: new Date().toISOString(),
+    }).select('*').single()
+
+    if (error || !saved) {
+      toast('Failed to add supplier: ' + (error?.message ?? 'unknown'), 'error')
+      return
     }
-    setSuppliers(prev => [...prev, newSupplier])
+
+    setSuppliers(prev => [...prev, saved as Supplier])
     setShowAdd(false)
     setForm({ name: '', contact: '', notes: '' })
     toast('Supplier added')
-
-    await supabase.from('suppliers').insert({
-      name: newSupplier.name,
-      contact: newSupplier.contact,
-      notes: newSupplier.notes,
-      offerings: [],
-    })
   }, [form, toast])
 
   const deleteSupplier = useCallback(async (id: string) => {
     if (!confirm('Delete this supplier?')) return
     setSuppliers(prev => prev.filter(s => s.id !== id))
-    await supabase.from('suppliers').delete().eq('id', id)
+    const { error } = await supabase.from('suppliers').delete().eq('id', id)
+    if (error) {
+      toast('Failed to delete: ' + error.message, 'error')
+      return
+    }
     toast('Supplier deleted')
   }, [toast])
 

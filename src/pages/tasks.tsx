@@ -89,19 +89,20 @@ export function TasksPage() {
   }, [])
 
   const toggleTask = useCallback(async (id: string) => {
-    setTasks(prev => prev.map(t =>
-      t.id === id ? { ...t, completed: !t.completed } : t
-    ))
-    const task = tasks.find(t => t.id === id)
-    if (task) {
-      await supabase.from('tasks').update({ completed: !task.completed }).eq('id', id)
-    }
-  }, [tasks])
+    let newCompleted = false
+    setTasks(prev => prev.map(t => {
+      if (t.id === id) { newCompleted = !t.completed; return { ...t, completed: newCompleted } }
+      return t
+    }))
+    const { error } = await supabase.from('tasks').update({ completed: newCompleted }).eq('id', id)
+    if (error) toast('Failed to update task', 'error')
+  }, [toast])
 
   const deleteTask = useCallback(async (id: string) => {
     setTasks(prev => prev.filter(t => t.id !== id))
-    await supabase.from('tasks').delete().eq('id', id)
-    toast('Task deleted')
+    const { error } = await supabase.from('tasks').delete().eq('id', id)
+    if (error) toast('Failed to delete task', 'error')
+    else toast('Task deleted')
   }, [toast])
 
   const addTask = useCallback(async () => {
@@ -147,12 +148,13 @@ export function TasksPage() {
     setTasks(prev => prev.map(t =>
       t.id === editingId ? { ...t, title: editTitle.trim(), due_date: editDueDate || null } : t
     ))
-    await supabase.from('tasks').update({
+    const { error } = await supabase.from('tasks').update({
       title: editTitle.trim(),
       due_date: editDueDate || null,
     }).eq('id', editingId)
+    if (error) toast('Failed to update task', 'error')
     setEditingId(null)
-  }, [editingId, editTitle, editDueDate])
+  }, [editingId, editTitle, editDueDate, toast])
 
   const pending = useMemo(() => tasks.filter(t => !t.completed), [tasks])
   const completed = useMemo(() => tasks.filter(t => t.completed), [tasks])

@@ -23,7 +23,7 @@ export function FinancePage() {
       const [payRes, expRes, projRes] = await Promise.all([
         supabase.from('payments').select('*').order('date', { ascending: false }),
         supabase.from('expenses').select('*').order('date', { ascending: false }),
-        supabase.from('projects').select('*, client:clients(name), quotes(total)'),
+        supabase.from('projects').select('*, client:clients(name)'),
       ])
       setPayments(payRes.data ?? [])
       setExpenses(expRes.data ?? [])
@@ -178,7 +178,7 @@ export function FinancePage() {
                       })}
                       {expenses.filter(e => e.date.startsWith(m.month)).map(e => (
                         <div key={e.id} className="flex justify-between text-xs">
-                          <span className="text-muted">{e.date} - {e.description}</span>
+                          <span className="text-muted">{fmtDate(e.date)} - {e.description}</span>
                           <span className="text-coral font-medium">-{fmtCurrency(e.amount)}</span>
                         </div>
                       ))}

@@ -39,7 +39,7 @@ export function ProjectsPage() {
       const enriched: ProjectWithFinance[] = (rawProjects ?? []).map(p => {
         const quotes = (p.quotes as Pick<Quote, 'total'>[] | null) ?? []
         const payments = (p.payments as Pick<Payment, 'amount'>[] | null) ?? []
-        const total = quotes.length > 0 ? quotes[quotes.length - 1]!.total : 0
+        const total = quotes.length > 0 ? quotes[0]!.total : 0
         const paid = payments.reduce((s, pay) => s + pay.amount, 0)
         return {
           ...p,
@@ -59,10 +59,20 @@ export function ProjectsPage() {
   }, [])
 
   const changeStage = useCallback(async (projectId: string, newStage: PipelineStage) => {
+    const previousStage = projects.find(p => p.id === projectId)?.pipeline_stage
     setProjects(prev => prev.map(p =>
       p.id === projectId ? { ...p, pipeline_stage: newStage } : p
     ))
-    await supabase.from('projects').update({ pipeline_stage: newStage }).eq('id', projectId)
+    const { error } = await supabase.from('projects').update({ pipeline_stage: newStage }).eq('id', projectId)
+    if (error) {
+      toast('Failed to update stage: ' + error.message, 'error')
+      if (previousStage) {
+        setProjects(prev => prev.map(p =>
+          p.id === projectId ? { ...p, pipeline_stage: previousStage } : p
+        ))
+      }
+      return
+    }
 
     if (newStage === 'confirmed') {
       // Guard: don't duplicate tasks if they already exist
@@ -91,7 +101,7 @@ export function ProjectsPage() {
     }
 
     toast('Stage changed to ' + PIPELINE_STAGES[newStage].label)
-  }, [toast])
+  }, [projects, toast])
 
   const filtered = useMemo(() => {
     let result = projects

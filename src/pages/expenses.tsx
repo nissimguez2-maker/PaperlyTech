@@ -8,7 +8,7 @@ import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useToast } from '@/components/ui/toast'
-import { fmtCurrency, fmtDate, uid } from '@/lib/utils'
+import { fmtCurrency, fmtDate } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import type { Expense } from '@/types/database'
 
@@ -54,34 +54,31 @@ export function ExpensesPage() {
       return
     }
 
-    const newExpense: Expense = {
-      id: uid(),
+    const { data: saved, error } = await supabase.from('expenses').insert({
       date: form.date,
       description: form.description.trim(),
       amount: parseFloat(form.amount),
       category: form.category,
-      supplier_id: null,
-      project_id: null,
-      sumit_done: false,
-      created_at: new Date().toISOString(),
+    }).select('*').single()
+
+    if (error || !saved) {
+      toast('Failed to add expense: ' + (error?.message ?? 'unknown'), 'error')
+      return
     }
 
-    setExpenses(prev => [newExpense, ...prev])
+    setExpenses(prev => [saved as Expense, ...prev])
     setShowAdd(false)
     setForm({ date: new Date().toISOString().slice(0, 10), description: '', amount: '', category: 'materials' })
     toast('Expense added')
-
-    await supabase.from('expenses').insert({
-      date: newExpense.date,
-      description: newExpense.description,
-      amount: newExpense.amount,
-      category: newExpense.category,
-    })
   }, [form, toast])
 
   const deleteExpense = useCallback(async (id: string) => {
     setExpenses(prev => prev.filter(e => e.id !== id))
-    await supabase.from('expenses').delete().eq('id', id)
+    const { error } = await supabase.from('expenses').delete().eq('id', id)
+    if (error) {
+      toast('Failed to delete: ' + error.message, 'error')
+      return
+    }
     toast('Expense deleted')
   }, [toast])
 
