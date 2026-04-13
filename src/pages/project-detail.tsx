@@ -167,13 +167,13 @@ export function ProjectDetailPage() {
               <h3 className="font-display text-lg font-bold text-bark">Details</h3>
               {editingStage ? (
                 <div className="flex gap-1 flex-wrap">
-                  {PIPELINE_STAGES.map(s => (
+                  {Object.entries(PIPELINE_STAGES).map(([key, s]) => (
                     <button
-                      key={s.value}
-                      onClick={() => updateStage(s.value as PipelineStage)}
+                      key={key}
+                      onClick={() => updateStage(key as PipelineStage)}
                       className={cn(
                         'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                        project.pipeline_stage === s.value
+                        project.pipeline_stage === key
                           ? 'bg-bark text-white'
                           : 'bg-cream text-muted hover:bg-cream-dark',
                       )}
