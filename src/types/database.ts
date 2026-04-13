@@ -62,7 +62,7 @@ export interface Database {
   }
 }
 
-// ── Core Types ──
+// Core Types
 
 export interface Profile {
   id: string
@@ -195,7 +195,7 @@ export interface SupplierOffering {
   note: string | null
 }
 
-// ── Computed types ──
+// Computed types
 
 export interface ProjectWithTotals extends Project {
   total: number
