@@ -162,10 +162,17 @@ export function ProjectDetailPage() {
 
   const changeStage = useCallback(async (stage: PipelineStage) => {
     if (!project) return
+
+    // Delivery gate: block if balance > 0
+    if (stage === 'delivered' && remaining > 0) {
+      toast('Cannot mark as Delivered — ' + fmtCurrency(remaining) + ' still owed', 'error')
+      return
+    }
+
     setProject({ ...project, pipeline_stage: stage })
     await supabase.from('projects').update({ pipeline_stage: stage }).eq('id', project.id)
 
-    if (stage === 'confirmed') {
+    if (stage === 'in_progress') {
       // Guard: don't duplicate tasks if they already exist
       const { count } = await supabase
         .from('tasks')
@@ -187,7 +194,7 @@ export function ProjectDetailPage() {
     }
 
     toast('Stage changed to ' + PIPELINE_STAGES[stage].label)
-  }, [project, items, toast])
+  }, [project, items, remaining, toast])
 
   const addPayment = useCallback(async () => {
     if (!project || !payAmount) return

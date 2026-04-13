@@ -3,18 +3,14 @@ import type { PipelineStage } from '@/types/database'
 
 const stageStyles: Record<PipelineStage, { bg: string; text: string; dot: string }> = {
   quoted: { bg: 'bg-navy-bg', text: 'text-navy', dot: 'bg-navy-dot' },
-  confirmed: { bg: 'bg-navy-bg', text: 'text-navy', dot: 'bg-navy' },
-  in_progress: { bg: 'bg-navy-bg', text: 'text-navy', dot: 'bg-navy-dot' },
-  delivered: { bg: 'bg-forest-bg', text: 'text-forest', dot: 'bg-forest-dot' },
-  paid: { bg: 'bg-forest-bg', text: 'text-forest', dot: 'bg-forest' },
+  in_progress: { bg: 'bg-navy-bg', text: 'text-navy', dot: 'bg-navy' },
+  delivered: { bg: 'bg-forest-bg', text: 'text-forest', dot: 'bg-forest' },
 }
 
 const stageLabels: Record<PipelineStage, string> = {
   quoted: 'Quoted',
-  confirmed: 'Confirmed',
   in_progress: 'In Progress',
   delivered: 'Delivered',
-  paid: 'Paid',
 }
 
 interface BadgeProps {

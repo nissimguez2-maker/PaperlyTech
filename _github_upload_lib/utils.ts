@@ -51,11 +51,15 @@ export function cn(...classes: (string | false | null | undefined)[]): string {
 export const PAYMENT_METHODS = {
   wire_transfer: 'Wire Transfer',
   cash: 'Cash',
+  bit: 'Bit',
 } as const
 
 /** Pipeline stage display config */
 export const PIPELINE_STAGES = {
+  lead: { label: 'Lead', color: 'bg-sand', dot: 'bg-muted' },
   quoted: { label: 'Quoted', color: 'bg-navy-bg', dot: 'bg-navy-dot' },
-  in_progress: { label: 'In Progress', color: 'bg-navy-bg', dot: 'bg-navy' },
-  delivered: { label: 'Delivered', color: 'bg-forest-bg', dot: 'bg-forest' },
+  confirmed: { label: 'Confirmed', color: 'bg-navy-bg', dot: 'bg-navy' },
+  in_progress: { label: 'In Progress', color: 'bg-navy-bg', dot: 'bg-navy-dot' },
+  delivered: { label: 'Delivered', color: 'bg-forest-bg', dot: 'bg-forest-dot' },
+  paid: { label: 'Paid', color: 'bg-forest-bg', dot: 'bg-forest' },
 } as const

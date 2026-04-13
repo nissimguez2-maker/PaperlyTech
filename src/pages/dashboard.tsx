@@ -84,7 +84,7 @@ export function DashboardPage() {
     toast('Task added')
   }, [quickTaskTitle, toast])
 
-  const activeProjects = data.projects.filter(p => !['paid'].includes(p.pipeline_stage))
+  const activeProjects = data.projects.filter(p => p.pipeline_stage !== 'delivered')
   const recentPayments = data.payments.slice(0, 5)
   const pendingTasks = data.tasks.filter(t => !t.completed)
   const overdueProjects = activeProjects.filter(p =>

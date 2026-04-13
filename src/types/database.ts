@@ -83,7 +83,7 @@ export interface Client {
   updated_at: string
 }
 
-export type PipelineStage = 'quoted' | 'confirmed' | 'in_progress' | 'delivered' | 'paid'
+export type PipelineStage = 'quoted' | 'in_progress' | 'delivered'
 
 export interface Project {
   id: string
