@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
 import { uid, fmtCurrency, safeFloat, cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 import type { Category, Article } from '@/types/database'
+import jsPDF from 'jspdf'
 
 interface QuoteItemLocal {
   id: string
@@ -29,43 +31,32 @@ interface QuotePageProps {
 export function QuotesPage({ categories, articles }: QuotePageProps) {
   const { toast } = useToast()
 
-  // Form state
   const [client, setClient] = useState('')
   const [deliveryDate, setDeliveryDate] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<QuoteItemLocal[]>([])
   const [discMode, setDiscMode] = useState<'pct' | 'fixed'>('pct')
   const [discVal, setDiscVal] = useState('')
-
-  // Drag state
   const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  // Build article groups for select dropdown
   const articleOptions = useMemo(() => {
     const parents = categories.filter(c => !c.parent_id)
     const result: { value: string; label: string }[] = []
-
     parents.forEach(parent => {
       const subs = categories.filter(c => c.parent_id === parent.id)
       subs.forEach(sub => {
         const arts = articles.filter(a => a.category_id === sub.id)
         arts.forEach(art => {
-          result.push({
-            value: art.id,
-            label: `${parent.name} > ${sub.name} > ${art.name}`,
-          })
+          result.push({ value: art.id, label: `${parent.name} > ${sub.name} > ${art.name}` })
         })
       })
     })
-
     return result
   }, [categories, articles])
 
-  // Calculations
   const subtotal = useMemo(() =>
-    items.reduce((sum, it) =>
-      it.isOffered ? sum : sum + safeFloat(it.qty) * safeFloat(it.unitPrice),
-    0),
+    items.reduce((sum, it) => it.isOffered ? sum : sum + safeFloat(it.qty) * safeFloat(it.unitPrice), 0),
   [items])
 
   const discAmount = discMode === 'pct'
@@ -74,7 +65,6 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
 
   const total = Math.max(0, subtotal - discAmount)
 
-  // Item management
   const addItem = useCallback(() => {
     setItems(prev => [...prev, {
       id: uid(), name: '', articleId: '', qty: 1,
@@ -97,7 +87,6 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
     }
   }, [articles, updateItem])
 
-  // Drag and drop
   const handleDragEnd = useCallback((fromIdx: number, toIdx: number) => {
     setItems(prev => {
       const next = [...prev]
@@ -117,17 +106,225 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
     setDiscVal('')
   }
 
+  // ── PDF generation ──
   const exportPdf = async () => {
-    if (!client.trim()) {
-      toast('Enter a client name', 'error')
-      return
+    if (!client.trim()) { toast('Enter a client name', 'error'); return }
+    if (items.length === 0) { toast('Add at least one item', 'error'); return }
+
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const W = 210
+      const margin = 20
+      const contentW = W - margin * 2
+      let y = margin
+
+      // Header
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(22)
+      doc.setTextColor(61, 53, 48) // bark
+      doc.text('Paperly Studio', margin, y)
+      y += 8
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.setTextColor(154, 145, 138) // muted
+      doc.text('Creative Direction for Premium Events', margin, y)
+      y += 12
+
+      // Divider
+      doc.setDrawColor(201, 181, 156) // gold
+      doc.setLineWidth(0.5)
+      doc.line(margin, y, W - margin, y)
+      y += 10
+
+      // Quote details
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(14)
+      doc.setTextColor(61, 53, 48)
+      doc.text('Quote', margin, y)
+      y += 8
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.setTextColor(61, 53, 48)
+      doc.text(`Client: ${client}`, margin, y)
+      y += 6
+      if (deliveryDate) {
+        doc.text(`Delivery: ${deliveryDate}`, margin, y)
+        y += 6
+      }
+      if (notes) {
+        doc.text(`Notes: ${notes}`, margin, y)
+        y += 6
+      }
+      y += 6
+
+      // Table header
+      const colX = [margin, margin + 8, margin + contentW * 0.5, margin + contentW * 0.65, margin + contentW * 0.8]
+      doc.setFillColor(239, 233, 227) // cream-dark
+      doc.rect(margin, y - 4, contentW, 8, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(154, 145, 138)
+      doc.text('#', colX[0]!, y)
+      doc.text('DESCRIPTION', colX[1]!, y)
+      doc.text('QTY', colX[2]!, y)
+      doc.text('PRICE', colX[3]!, y)
+      doc.text('TOTAL', colX[4]!, y)
+      y += 8
+
+      // Table rows
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      items.forEach((item, idx) => {
+        if (y > 260) { doc.addPage(); y = margin }
+        const lineTotal = item.isOffered ? 0 : safeFloat(item.qty) * safeFloat(item.unitPrice)
+        doc.setTextColor(61, 53, 48)
+        doc.text(String(idx + 1), colX[0]!, y)
+        const label = item.name || articleOptions.find(o => o.value === item.articleId)?.label || 'Item'
+        doc.text(label.substring(0, 50), colX[1]!, y)
+        if (!item.hideQty) doc.text(String(item.qty), colX[2]!, y)
+        doc.text(`NIS ${safeFloat(item.unitPrice).toFixed(2)}`, colX[3]!, y)
+        if (item.isOffered) {
+          doc.setTextColor(74, 140, 92) // forest
+          doc.text('Offered', colX[4]!, y)
+        } else {
+          doc.text(`NIS ${lineTotal.toFixed(2)}`, colX[4]!, y)
+        }
+        y += 6
+      })
+
+      y += 4
+      doc.setDrawColor(217, 207, 199) // sand
+      doc.line(margin, y, W - margin, y)
+      y += 8
+
+      // Totals
+      const totX = W - margin - 60
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.setTextColor(154, 145, 138)
+      doc.text('Subtotal:', totX, y)
+      doc.setTextColor(61, 53, 48)
+      doc.text(`NIS ${subtotal.toFixed(2)}`, totX + 40, y)
+      y += 6
+
+      if (discAmount > 0) {
+        doc.setTextColor(154, 145, 138)
+        doc.text('Discount:', totX, y)
+        doc.setTextColor(160, 80, 80) // coral
+        doc.text(`-NIS ${discAmount.toFixed(2)}`, totX + 40, y)
+        y += 6
+      }
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(14)
+      doc.setTextColor(61, 53, 48)
+      doc.text('Total:', totX, y)
+      doc.text(`NIS ${total.toFixed(2)}`, totX + 40, y)
+
+      // Footer
+      y = 280
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(154, 145, 138)
+      doc.text('Paperly Studio - paperly.com', margin, y)
+      doc.text(`Generated ${new Date().toLocaleDateString()}`, W - margin - 40, y)
+
+      const safeName = client.replace(/[^a-zA-Z0-9]/g, '_')
+      doc.save(`Paperly_Quote_${safeName}.pdf`)
+      toast('PDF exported successfully')
+    } catch (err) {
+      console.error('PDF export error:', err)
+      toast('Failed to export PDF', 'error')
     }
-    if (items.length === 0) {
-      toast('Add at least one item', 'error')
-      return
+  }
+
+  // ── Save as project (creates client + project + quote in Supabase) ──
+  const saveAsProject = async () => {
+    if (!client.trim()) { toast('Enter a client name', 'error'); return }
+    if (items.length === 0) { toast('Add at least one item', 'error'); return }
+
+    setSaving(true)
+    try {
+      // 1. Upsert client
+      const { data: existingClients } = await supabase
+        .from('clients')
+        .select('id')
+        .ilike('name', client.trim())
+        .limit(1)
+
+      let clientId: string
+      if (existingClients && existingClients.length > 0) {
+        clientId = (existingClients[0] as { id: string }).id
+      } else {
+        const { data: newClient, error: clientErr } = await supabase
+          .from('clients')
+          .insert({ name: client.trim() })
+          .select('id')
+          .single()
+        if (clientErr || !newClient) throw clientErr || new Error('Failed to create client')
+        clientId = (newClient as { id: string }).id
+      }
+
+      // 2. Create project
+      const { data: project, error: projErr } = await supabase
+        .from('projects')
+        .insert({
+          client_id: clientId,
+          name: `${client.trim()} - Quote`,
+          delivery_date: deliveryDate || null,
+          pipeline_stage: 'quoted',
+          notes: notes || null,
+          sumit_done: false,
+        })
+        .select('id')
+        .single()
+      if (projErr || !project) throw projErr || new Error('Failed to create project')
+      const projectId = (project as { id: string }).id
+
+      // 3. Create quote
+      const { data: quote, error: quoteErr } = await supabase
+        .from('quotes')
+        .insert({
+          project_id: projectId,
+          version: 1,
+          subtotal,
+          discount_mode: discMode,
+          discount_value: safeFloat(discVal),
+          total,
+          notes: notes || null,
+          exported_at: null,
+        })
+        .select('id')
+        .single()
+      if (quoteErr || !quote) throw quoteErr || new Error('Failed to create quote')
+      const quoteId = (quote as { id: string }).id
+
+      // 4. Insert quote items
+      const quoteItems = items.map((it, idx) => ({
+        quote_id: quoteId,
+        article_id: it.articleId || null,
+        name: it.name || articleOptions.find(o => o.value === it.articleId)?.label || 'Item',
+        description: null,
+        quantity: it.qty,
+        unit_price: safeFloat(it.unitPrice),
+        is_override: it.isOverride,
+        is_offered: it.isOffered,
+        hide_qty: it.hideQty,
+        sort_order: idx,
+      }))
+
+      const { error: itemsErr } = await supabase.from('quote_items').insert(quoteItems)
+      if (itemsErr) throw itemsErr
+
+      toast('Project and client saved!')
+      clearQuote()
+    } catch (err) {
+      console.error('Save error:', err)
+      toast('Failed to save project', 'error')
+    } finally {
+      setSaving(false)
     }
-    // TODO: PDF generation with jsPDF
-    toast('Quote exported as PDF')
   }
 
   return (
@@ -147,9 +344,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
       />
 
       <div className="grid grid-cols-3 gap-6">
-        {/* Main form */}
         <div className="col-span-2 space-y-6">
-          {/* Client details */}
           <Card>
             <div className="grid grid-cols-3 gap-4">
               <Input label="Client Name" value={client} onChange={e => setClient(e.target.value)} placeholder="e.g. Sarah & David" />
@@ -158,17 +353,14 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
             </div>
           </Card>
 
-          {/* Line items */}
           <Card>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-display text-lg font-bold text-bark">Line Items</h3>
               <Button variant="primary" size="sm" onClick={addItem}>
-                <Plus size={14} />
-                Add Item
+                <Plus size={14} /> Add Item
               </Button>
             </div>
 
-            {/* Table header */}
             {items.length > 0 && (
               <div className="mb-2 grid grid-cols-[24px_1fr_2fr_70px_90px_90px_80px] gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
                 <div />
@@ -181,7 +373,6 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
               </div>
             )}
 
-            {/* Items */}
             <div className="space-y-1">
               {items.map((item, idx) => {
                 const lineTotal = item.isOffered ? 0 : safeFloat(item.qty) * safeFloat(item.unitPrice)
@@ -199,14 +390,12 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                     )}
                   >
                     <GripVertical size={14} className="cursor-grab text-sand" />
-
                     <input
                       value={item.name}
                       onChange={e => updateItem(item.id, { name: e.target.value })}
                       className="w-full rounded border border-sand/60 bg-white px-2 py-1.5 text-xs focus:border-gold-dark focus:outline-none"
                       placeholder="Description"
                     />
-
                     <select
                       value={item.articleId}
                       onChange={e => handleArticleChange(item.id, e.target.value)}
@@ -217,7 +406,6 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
-
                     <input
                       type="number"
                       min={1}
@@ -225,7 +413,6 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                       onChange={e => updateItem(item.id, { qty: safeFloat(e.target.value, 1) })}
                       className="w-full rounded border border-sand/60 bg-white px-2 py-1.5 text-center text-xs focus:border-gold-dark focus:outline-none"
                     />
-
                     <input
                       type="number"
                       step="0.01"
@@ -236,20 +423,14 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                         item.isOverride ? 'border-gold bg-gold/5' : 'border-sand/60 bg-white',
                       )}
                     />
-
-                    <span className={cn(
-                      'text-center text-xs font-semibold',
-                      item.isOffered ? 'text-forest' : 'text-bark',
-                    )}>
+                    <span className={cn('text-center text-xs font-semibold', item.isOffered ? 'text-forest' : 'text-bark')}>
                       {item.isOffered ? 'Offered' : fmtCurrency(lineTotal)}
                     </span>
-
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => updateItem(item.id, { isOffered: !item.isOffered })}
                         className={cn('rounded p-1 transition-colors', item.isOffered ? 'text-forest' : 'text-sand hover:text-muted')}
                         title={item.isOffered ? 'Remove offer' : 'Mark as offered'}
-                        aria-label={item.isOffered ? 'Remove offer' : 'Mark as offered'}
                       >
                         <Gift size={14} />
                       </button>
@@ -257,14 +438,12 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                         onClick={() => updateItem(item.id, { hideQty: !item.hideQty })}
                         className={cn('rounded p-1 transition-colors', item.hideQty ? 'text-navy' : 'text-sand hover:text-muted')}
                         title={item.hideQty ? 'Show qty in PDF' : 'Hide qty in PDF'}
-                        aria-label={item.hideQty ? 'Show qty in PDF' : 'Hide qty in PDF'}
                       >
                         {item.hideQty ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
                       <button
                         onClick={() => removeItem(item.id)}
                         className="rounded p-1 text-sand hover:text-coral transition-colors"
-                        aria-label="Remove item"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -285,36 +464,21 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
           </Card>
         </div>
 
-        {/* Summary sidebar */}
         <div className="space-y-6">
           <Card className="sticky top-8">
             <h3 className="mb-4 font-display text-lg font-bold text-bark">Summary</h3>
-
-            {/* Discount */}
             <div className="mb-4">
-              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">
-                Discount
-              </label>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">Discount</label>
               <div className="flex gap-2">
                 <div className="flex rounded-lg border border-sand overflow-hidden">
                   <button
                     onClick={() => setDiscMode('pct')}
-                    className={cn(
-                      'px-3 py-1.5 text-xs font-medium transition-colors',
-                      discMode === 'pct' ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream',
-                    )}
-                  >
-                    %
-                  </button>
+                    className={cn('px-3 py-1.5 text-xs font-medium transition-colors', discMode === 'pct' ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream')}
+                  >%</button>
                   <button
                     onClick={() => setDiscMode('fixed')}
-                    className={cn(
-                      'px-3 py-1.5 text-xs font-medium transition-colors',
-                      discMode === 'fixed' ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream',
-                    )}
-                  >
-                    NIS 
-                  </button>
+                    className={cn('px-3 py-1.5 text-xs font-medium transition-colors', discMode === 'fixed' ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream')}
+                  >NIS</button>
                 </div>
                 <input
                   type="number"
@@ -339,22 +503,16 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
               )}
               <div className="flex justify-between border-t border-sand/40 pt-3">
                 <span className="text-sm font-semibold text-bark">Total</span>
-                <span className="font-display text-3xl font-bold text-bark">
-                  {fmtCurrency(total)}
-                </span>
+                <span className="font-display text-3xl font-bold text-bark">{fmtCurrency(total)}</span>
               </div>
             </div>
 
             <div className="mt-6 flex flex-col gap-2">
               <Button variant="primary" className="w-full" onClick={exportPdf}>
-                <Download size={16} />
-                Export PDF
+                <Download size={16} /> Export PDF
               </Button>
-              <Button variant="secondary" className="w-full" onClick={() => {
-                // TODO: Save as project
-                toast('Project created')
-              }}>
-                Save as Project
+              <Button variant="secondary" className="w-full" onClick={saveAsProject} disabled={saving}>
+                {saving ? 'Saving...' : 'Save as Project'}
               </Button>
             </div>
           </Card>
