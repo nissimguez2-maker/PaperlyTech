@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
-  Plus, Trash2, GripVertical, Gift, Eye, EyeOff, Download, Save,
+  Plus, Trash2, GripVertical, Gift, Eye, EyeOff, Download,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
@@ -61,7 +61,6 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
     loadClients()
   }, [])
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (clientRef.current && !clientRef.current.contains(e.target as Node)) {
@@ -78,13 +77,9 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
     return allClients.filter(c => c.name.toLowerCase().includes(q))
   }, [client, allClients])
 
-  // Article search filter
-  const [articleSearch, setArticleSearch] = useState<Record<string, string>>({})
-
   const articleOptions = useMemo(() => {
     const parents = categories.filter(c => !c.parent_id)
     const result: { value: string; label: string }[] = []
-
     parents.forEach(parent => {
       const subs = categories.filter(c => c.parent_id === parent.id)
       subs.forEach(sub => {
@@ -97,7 +92,6 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         })
       })
     })
-
     return result
   }, [categories, articles])
 
@@ -107,12 +101,10 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
     0),
   [items])
 
-  // Discount validation: cap % at 100
   const clampedDiscVal = discMode === 'pct' ? Math.min(safeFloat(discVal), 100) : safeFloat(discVal)
   const discAmount = discMode === 'pct'
     ? subtotal * clampedDiscVal / 100
     : clampedDiscVal
-
   const total = Math.max(0, subtotal - discAmount)
 
   const addItem = useCallback(() => {
@@ -157,37 +149,8 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
     setShowClearConfirm(false)
   }
 
-  const exportPdf = () => {
-    if (!client.trim()) {
-      toast('Enter a client name', 'error')
-      return
-    }
-    if (items.length === 0) {
-      toast('Add at least one item', 'error')
-      return
-    }
-
-    generateQuotePdf({
-      clientName: client.trim(),
-      deliveryDate: deliveryDate || null,
-      notes: notes || null,
-      items: items.map(it => ({
-        name: it.name || 'Item',
-        description: articleOptions.find(o => o.value === it.articleId)?.label || null,
-        quantity: it.qty,
-        unitPrice: safeFloat(it.unitPrice),
-        isOffered: it.isOffered,
-        hideQty: it.hideQty,
-      })),
-      subtotal,
-      discountAmount: discAmount,
-      total,
-    })
-
-    toast('PDF exported successfully')
-  }
-
-  const saveAsProject = async () => {
+  // Single button: Export PDF + Save client/project
+  const exportAndSave = async () => {
     if (!client.trim()) {
       toast('Enter a client name', 'error')
       return
@@ -199,7 +162,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
 
     setSaving(true)
     try {
-      // Upsert client by name
+      // 1. Upsert client by name
       const { data: existingClients } = await supabase
         .from('clients')
         .select('id')
@@ -219,13 +182,13 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         clientId = newClient.id
       }
 
-      // Build project name: "Client - Mon YYYY" or with delivery date
+      // 2. Build project name
       const dateLabel = deliveryDate
         ? new Date(deliveryDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
         : new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
       const projectName = client.trim() + ' - ' + dateLabel
 
-      // Create project
+      // 3. Create project
       const { data: project, error: projErr } = await supabase
         .from('projects')
         .insert({
@@ -239,7 +202,12 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         .single()
       if (projErr || !project) throw new Error('Failed to create project')
 
-      // Create quote
+      // 4. Build discount label
+      const discLabel = discAmount > 0
+        ? (discMode === 'pct' ? 'Discount (' + clampedDiscVal + '%)' : 'Discount (NIS ' + clampedDiscVal + ')')
+        : undefined
+
+      // 5. Create quote
       const { data: quote, error: quoteErr } = await supabase
         .from('quotes')
         .insert({
@@ -250,12 +218,13 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
           discount_value: safeFloat(discVal),
           total,
           notes: notes || null,
+          exported_at: new Date().toISOString(),
         })
         .select('id')
         .single()
       if (quoteErr || !quote) throw new Error('Failed to create quote')
 
-      // Create quote items
+      // 6. Create quote items
       const quoteItems = items.map((it, idx) => ({
         quote_id: quote.id,
         article_id: it.articleId || null,
@@ -268,18 +237,36 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         hide_qty: it.hideQty,
         sort_order: idx,
       }))
-
       const { error: itemsErr } = await supabase.from('quote_items').insert(quoteItems)
       if (itemsErr) throw new Error('Failed to create quote items')
 
-      // Refresh client list in case a new client was added
+      // 7. Generate & download PDF
+      generateQuotePdf({
+        clientName: client.trim(),
+        deliveryDate: deliveryDate || null,
+        notes: notes || null,
+        items: items.map(it => ({
+          name: it.name || 'Item',
+          description: articleOptions.find(o => o.value === it.articleId)?.label || null,
+          quantity: it.qty,
+          unitPrice: safeFloat(it.unitPrice),
+          isOffered: it.isOffered,
+          hideQty: it.hideQty,
+        })),
+        subtotal,
+        discountAmount: discAmount,
+        discountLabel: discLabel,
+        total,
+      })
+
+      // 8. Refresh client list
       const { data: refreshedClients } = await supabase.from('clients').select('id, name').order('name')
       if (refreshedClients) setAllClients(refreshedClients)
 
-      toast('Project created: ' + projectName)
+      toast('PDF exported & project saved: ' + projectName)
       clearQuote()
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to save project', 'error')
+      toast(err instanceof Error ? err.message : 'Failed to save', 'error')
     } finally {
       setSaving(false)
     }
@@ -299,10 +286,6 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                 clearQuote()
               }
             }}>Clear</Button>
-            <Button variant="primary" onClick={exportPdf}>
-              <Download size={16} />
-              Export PDF
-            </Button>
           </div>
         }
       />
@@ -311,7 +294,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         <div className="col-span-2 space-y-6">
           <Card>
             <div className="grid grid-cols-3 gap-4">
-              {/* Client autocomplete combo-box */}
+              {/* Client autocomplete */}
               <div ref={clientRef} className="relative">
                 <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">Client Name</label>
                 <input
@@ -367,12 +350,6 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
             <div className="space-y-1">
               {items.map((item, idx) => {
                 const lineTotal = item.isOffered ? 0 : safeFloat(item.qty) * safeFloat(item.unitPrice)
-                const searchKey = item.id
-                const searchVal = articleSearch[searchKey] ?? ''
-                const filteredArticles = searchVal.trim()
-                  ? articleOptions.filter(o => o.label.toLowerCase().includes(searchVal.toLowerCase()))
-                  : articleOptions
-
                 return (
                   <div
                     key={item.id}
@@ -395,32 +372,17 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                       placeholder="Description"
                     />
 
-                    <div className="relative">
-                      <input
-                        value={searchVal}
-                        onChange={e => setArticleSearch(prev => ({ ...prev, [searchKey]: e.target.value }))}
-                        onFocus={() => setArticleSearch(prev => ({ ...prev, [searchKey]: prev[searchKey] ?? '' }))}
-                        placeholder={item.articleId ? articleOptions.find(o => o.value === item.articleId)?.label ?? 'Search article...' : 'Search article...'}
-                        className="w-full rounded border border-sand/60 bg-white px-2 py-1.5 text-xs focus:border-gold-dark focus:outline-none"
-                      />
-                      {(searchVal !== undefined && document.activeElement?.closest('.relative')?.contains(document.activeElement)) && filteredArticles.length > 0 && searchVal.trim() && (
-                        <div className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border border-sand bg-white py-1 shadow-lg">
-                          {filteredArticles.slice(0, 15).map(o => (
-                            <button
-                              key={o.value}
-                              onMouseDown={(e) => {
-                                e.preventDefault()
-                                handleArticleChange(item.id, o.value)
-                                setArticleSearch(prev => ({ ...prev, [searchKey]: '' }))
-                              }}
-                              className="w-full px-2 py-1.5 text-left text-xs text-muted hover:bg-cream hover:text-bark transition-colors"
-                            >
-                              {o.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    {/* Article dropdown */}
+                    <select
+                      value={item.articleId}
+                      onChange={e => handleArticleChange(item.id, e.target.value)}
+                      className="w-full appearance-none rounded border border-sand/60 bg-white px-2 py-1.5 text-xs focus:border-gold-dark focus:outline-none"
+                    >
+                      <option value="">Select article...</option>
+                      {articleOptions.map(o => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
 
                     <input
                       type="number"
@@ -555,21 +517,17 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col gap-2">
-              <Button variant="primary" className="w-full" onClick={exportPdf}>
+            <div className="mt-6">
+              <Button variant="primary" className="w-full" onClick={exportAndSave} disabled={saving}>
                 <Download size={16} />
-                Export PDF
-              </Button>
-              <Button variant="secondary" className="w-full" onClick={saveAsProject} disabled={saving}>
-                <Save size={16} />
-                {saving ? 'Saving...' : 'Save as Project'}
+                {saving ? 'Saving...' : 'Export PDF'}
               </Button>
             </div>
           </Card>
         </div>
       </div>
 
-      {/* Clear confirmation modal */}
+      {/* Clear confirmation */}
       <Modal open={showClearConfirm} onClose={() => setShowClearConfirm(false)} title="Clear this quote?" width="sm">
         <p className="text-sm text-muted mb-6">This will remove all items, client info, and discount. This cannot be undone.</p>
         <div className="flex gap-3 justify-end">
