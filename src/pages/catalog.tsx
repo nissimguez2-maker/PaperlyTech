@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import {
-  Plus, ChevronRight, ChevronDown, Pencil, Trash2,
+  Plus, ChevronRight, ChevronDown, Trash2,
   FolderPlus, Package,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
@@ -21,7 +21,7 @@ interface CatalogPageProps {
 export function CatalogPage({ categories, articles, onUpdateCategories, onUpdateArticles }: CatalogPageProps) {
   const { toast } = useToast()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [editing, setEditing] = useState<{ id: string; type: 'cat' | 'art'; name: string; price?: string } | null>(null)
+  const [_editing, _setEditing] = useState<{ id: string; type: 'cat' | 'art'; name: string; price?: string } | null>(null)
 
   const toggle = (id: string) => {
     setExpanded(prev => {
