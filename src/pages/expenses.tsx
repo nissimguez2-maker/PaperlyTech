@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Plus, Trash2, Receipt } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
-import { Card, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -163,7 +163,7 @@ export function ExpensesPage() {
             placeholder="What was this expense for?"
           />
           <Input
-            label="Amount (₪)"
+            label="Amount (NIS )"
             type="number"
             value={form.amount}
             onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
