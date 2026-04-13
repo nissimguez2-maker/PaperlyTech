@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/toast'
 import { uid, fmtCurrency, safeFloat, cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import type { Category, Article } from '@/types/database'
-import jsPDF from 'jspdf'
+import { generateQuotePdf } from '@/lib/pdf-quote'
 
 interface QuoteItemLocal {
   id: string
@@ -112,126 +112,27 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
     if (items.length === 0) { toast('Add at least one item', 'error'); return }
 
     try {
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      const W = 210
-      const margin = 20
-      const contentW = W - margin * 2
-      let y = margin
+      const pdfItems = items.map(it => ({
+        name: it.name || articleOptions.find(o => o.value === it.articleId)?.label || 'Item',
+        qty: it.qty,
+        unitPrice: safeFloat(it.unitPrice),
+        isOffered: it.isOffered,
+        hideQty: it.hideQty,
+      }))
 
-      // Header
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(22)
-      doc.setTextColor(61, 53, 48) // bark
-      doc.text('Paperly Studio', margin, y)
-      y += 8
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      doc.setTextColor(154, 145, 138) // muted
-      doc.text('Creative Direction for Premium Events', margin, y)
-      y += 12
+      const discLabel = discMode === 'pct' ? `Discount (${discVal}%)` : 'Discount'
 
-      // Divider
-      doc.setDrawColor(201, 181, 156) // gold
-      doc.setLineWidth(0.5)
-      doc.line(margin, y, W - margin, y)
-      y += 10
-
-      // Quote details
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(14)
-      doc.setTextColor(61, 53, 48)
-      doc.text('Quote', margin, y)
-      y += 8
-
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      doc.setTextColor(61, 53, 48)
-      doc.text(`Client: ${client}`, margin, y)
-      y += 6
-      if (deliveryDate) {
-        doc.text(`Delivery: ${deliveryDate}`, margin, y)
-        y += 6
-      }
-      if (notes) {
-        doc.text(`Notes: ${notes}`, margin, y)
-        y += 6
-      }
-      y += 6
-
-      // Table header
-      const colX = [margin, margin + 8, margin + contentW * 0.5, margin + contentW * 0.65, margin + contentW * 0.8]
-      doc.setFillColor(239, 233, 227) // cream-dark
-      doc.rect(margin, y - 4, contentW, 8, 'F')
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(8)
-      doc.setTextColor(154, 145, 138)
-      doc.text('#', colX[0]!, y)
-      doc.text('DESCRIPTION', colX[1]!, y)
-      doc.text('QTY', colX[2]!, y)
-      doc.text('PRICE', colX[3]!, y)
-      doc.text('TOTAL', colX[4]!, y)
-      y += 8
-
-      // Table rows
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      items.forEach((item, idx) => {
-        if (y > 260) { doc.addPage(); y = margin }
-        const lineTotal = item.isOffered ? 0 : safeFloat(item.qty) * safeFloat(item.unitPrice)
-        doc.setTextColor(61, 53, 48)
-        doc.text(String(idx + 1), colX[0]!, y)
-        const label = item.name || articleOptions.find(o => o.value === item.articleId)?.label || 'Item'
-        doc.text(label.substring(0, 50), colX[1]!, y)
-        if (!item.hideQty) doc.text(String(item.qty), colX[2]!, y)
-        doc.text(`NIS ${safeFloat(item.unitPrice).toFixed(2)}`, colX[3]!, y)
-        if (item.isOffered) {
-          doc.setTextColor(74, 140, 92) // forest
-          doc.text('Offered', colX[4]!, y)
-        } else {
-          doc.text(`NIS ${lineTotal.toFixed(2)}`, colX[4]!, y)
-        }
-        y += 6
+      generateQuotePdf({
+        client: client.trim(),
+        deliveryDate,
+        notes,
+        items: pdfItems,
+        subtotal,
+        discAmount,
+        discLabel,
+        total,
       })
 
-      y += 4
-      doc.setDrawColor(217, 207, 199) // sand
-      doc.line(margin, y, W - margin, y)
-      y += 8
-
-      // Totals
-      const totX = W - margin - 60
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      doc.setTextColor(154, 145, 138)
-      doc.text('Subtotal:', totX, y)
-      doc.setTextColor(61, 53, 48)
-      doc.text(`NIS ${subtotal.toFixed(2)}`, totX + 40, y)
-      y += 6
-
-      if (discAmount > 0) {
-        doc.setTextColor(154, 145, 138)
-        doc.text('Discount:', totX, y)
-        doc.setTextColor(160, 80, 80) // coral
-        doc.text(`-NIS ${discAmount.toFixed(2)}`, totX + 40, y)
-        y += 6
-      }
-
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(14)
-      doc.setTextColor(61, 53, 48)
-      doc.text('Total:', totX, y)
-      doc.text(`NIS ${total.toFixed(2)}`, totX + 40, y)
-
-      // Footer
-      y = 280
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(8)
-      doc.setTextColor(154, 145, 138)
-      doc.text('Paperly Studio - paperly.com', margin, y)
-      doc.text(`Generated ${new Date().toLocaleDateString()}`, W - margin - 40, y)
-
-      const safeName = client.replace(/[^a-zA-Z0-9]/g, '_')
-      doc.save(`Paperly_Quote_${safeName}.pdf`)
       toast('PDF exported successfully')
     } catch (err) {
       console.error('PDF export error:', err)
