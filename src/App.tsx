@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import { useAuth } from '@/lib/auth-context'
 import { AppLayout } from '@/components/layout/app-layout'
 import { LoginPage } from '@/pages/login'
@@ -36,7 +36,7 @@ function ProtectedRoutes() {
 
   const updateCategories = async (cats: Category[]) => {
     setCategories(cats)
-    // Sync to Supabase (simplified — in production, use proper upsert)
+    // Sync to Supabase (simplified - in production, use proper upsert)
     // For now, we just persist the full list
   }
 
