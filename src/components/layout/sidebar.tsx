@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, FolderKanban, Wallet,
-  CheckSquare, Receipt, BookOpen, Users, LogOut, Settings,
+  CheckSquare, Receipt, BookOpen, Users, UserCircle, LogOut, Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
@@ -16,6 +16,7 @@ const navItems = [
 ]
 
 const secondaryItems = [
+  { to: '/clients', icon: UserCircle, label: 'Clients' },
   { to: '/catalog', icon: BookOpen, label: 'Catalog' },
   { to: '/suppliers', icon: Users, label: 'Suppliers' },
   { to: '/settings', icon: Settings, label: 'Settings' },

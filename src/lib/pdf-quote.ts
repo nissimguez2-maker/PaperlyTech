@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf'
+import { PDF_FONTS } from './pdf-fonts'
 
 export interface PdfQuoteItem {
   name: string
@@ -42,8 +43,26 @@ function fmtNIS(n: number): string {
   return n.toLocaleString('en-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
+function registerFonts(doc: jsPDF) {
+  // Inter
+  doc.addFileToVFS('Inter-Regular.ttf', PDF_FONTS.InterRegular)
+  doc.addFont('Inter-Regular.ttf', 'Inter', 'normal')
+  doc.addFileToVFS('Inter-Bold.ttf', PDF_FONTS.InterBold)
+  doc.addFont('Inter-Bold.ttf', 'Inter', 'bold')
+  doc.addFileToVFS('Inter-SemiBold.ttf', PDF_FONTS.InterSemiBold)
+  doc.addFont('Inter-SemiBold.ttf', 'InterSB', 'normal')
+
+  // Cormorant Garamond
+  doc.addFileToVFS('Cormorant-Bold.ttf', PDF_FONTS.CormorantBold)
+  doc.addFont('Cormorant-Bold.ttf', 'Cormorant', 'bold')
+  doc.addFileToVFS('Cormorant-Italic.ttf', PDF_FONTS.CormorantItalic)
+  doc.addFont('Cormorant-Italic.ttf', 'Cormorant', 'italic')
+}
+
 export function generateQuotePdf(data: PdfQuoteData) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  registerFonts(doc)
+
   const pageW = 210
   const pageH = 297
   const mL = 18
@@ -55,36 +74,40 @@ export function generateQuotePdf(data: PdfQuoteData) {
   doc.setFillColor(...PAGE_BG)
   doc.rect(0, 0, pageW, pageH, 'F')
 
-  // ── Left gold accent stripe (2.5mm wide) ──
+  // ── Left gold accent stripe ──
   doc.setFillColor(...GOLD)
   doc.rect(0, 0, 2.5, pageH, 'F')
 
   // ══════════════ HEADER ══════════════
-  doc.setFont('helvetica', 'bold')
+
+  // PAPERLY in Inter Bold
+  doc.setFont('Inter', 'bold')
   doc.setFontSize(24)
   doc.setTextColor(...NEAR_BLACK)
   doc.text('PAPERLY', mL, 26)
   const pw = doc.getTextWidth('PAPERLY ')
-  doc.setFont('helvetica', 'italic')
-  doc.setFontSize(24)
+
+  // STUDIO in Cormorant Italic
+  doc.setFont('Cormorant', 'italic')
+  doc.setFontSize(26)
   doc.setTextColor(...GOLD)
   doc.text('STUDIO', mL + pw, 26)
 
   // Tagline
-  doc.setFont('helvetica', 'normal')
+  doc.setFont('Inter', 'normal')
   doc.setFontSize(6.5)
   doc.setTextColor(...WARM_GRAY)
   doc.text('CREATIVE DIRECTION FOR PREMIUM EVENTS', mL, 32)
 
   // Right: quote ref + date
   const quoteRef = data.quoteRef || generateQuoteRef()
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('Inter', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(...GOLD)
   doc.text(quoteRef, rightEdge, 22, { align: 'right' })
 
   const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-  doc.setFont('helvetica', 'normal')
+  doc.setFont('Inter', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...WARM_GRAY)
   doc.text(today, rightEdge, 28, { align: 'right' })
@@ -95,7 +118,7 @@ export function generateQuotePdf(data: PdfQuoteData) {
   doc.line(mL, 36, rightEdge, 36)
 
   // ══════════════ QUOTE LABEL ══════════════
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('Inter', 'bold')
   doc.setFontSize(9)
   doc.setTextColor(...GOLD)
   doc.text('QUOTE', mL, 43)
@@ -111,29 +134,33 @@ export function generateQuotePdf(data: PdfQuoteData) {
 
   const pad = 8
 
-  // Prepared for
-  doc.setFont('helvetica', 'normal')
+  // PREPARED FOR label
+  doc.setFont('Inter', 'normal')
   doc.setFontSize(7)
   doc.setTextColor(...WARM_GRAY)
   doc.text('PREPARED FOR', mL + pad, cY + 8)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(16)
-  doc.setTextColor(...NEAR_BLACK)
-  doc.text(data.clientName, mL + pad, cY + 16)
 
+  // Client name in Cormorant Bold
+  doc.setFont('Cormorant', 'bold')
+  doc.setFontSize(18)
+  doc.setTextColor(...NEAR_BLACK)
+  doc.text(data.clientName, mL + pad, cY + 17)
+
+  // Notes
   if (data.notes) {
-    doc.setFont('helvetica', 'italic')
-    doc.setFontSize(8)
+    doc.setFont('Cormorant', 'italic')
+    doc.setFontSize(9)
     doc.setTextColor(...WARM_GRAY)
-    doc.text(data.notes, mL + pad, cY + 23)
+    doc.text(data.notes, mL + pad, cY + 24)
   }
 
-  // Delivery date
-  doc.setFont('helvetica', 'normal')
+  // DELIVERY DATE
+  doc.setFont('Inter', 'normal')
   doc.setFontSize(7)
   doc.setTextColor(...WARM_GRAY)
   doc.text('DELIVERY DATE', rightEdge - pad, cY + 8, { align: 'right' })
-  doc.setFont('helvetica', 'bold')
+
+  doc.setFont('InterSB', 'normal')
   doc.setFontSize(12)
   doc.setTextColor(...NEAR_BLACK)
   if (data.deliveryDate) {
@@ -148,22 +175,21 @@ export function generateQuotePdf(data: PdfQuoteData) {
   // ══════════════ LINE ITEMS TABLE ══════════════
   let y = cY + cH + 8
 
-  // Column X positions — adjusted for proper spacing
   const col = {
-    num: mL + 6,       // row number circle center
-    desc: mL + 16,     // description left edge
-    qty: 118,           // qty right-align point
-    price: 152,         // unit price right-align point
-    total: rightEdge,   // total right-align point
+    num: mL + 6,
+    desc: mL + 16,
+    qty: 118,
+    price: 152,
+    total: rightEdge,
   }
 
   // ── Table header (dark bar) ──
   const hdrH = 9
   doc.setFillColor(...NEAR_BLACK)
   doc.roundedRect(mL, y, contentW, hdrH, 2, 2, 'F')
-  doc.rect(mL, y + hdrH - 2, contentW, 2, 'F') // square off bottom
+  doc.rect(mL, y + hdrH - 2, contentW, 2, 'F')
 
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('InterSB', 'normal')
   doc.setFontSize(7)
   doc.setTextColor(...PAGE_BG)
   doc.text('#', mL + 6, y + 6)
@@ -177,7 +203,6 @@ export function generateQuotePdf(data: PdfQuoteData) {
   // ── Item rows ──
   const rowH = 11
   data.items.forEach((item, idx) => {
-    // Alternating row fill
     if (idx % 2 === 1) {
       doc.setFillColor(...LIGHT_CREAM)
       doc.rect(mL, y, contentW, rowH, 'F')
@@ -185,16 +210,16 @@ export function generateQuotePdf(data: PdfQuoteData) {
 
     const mid = y + rowH / 2 + 1
 
-    // Row number in muted circle
+    // Row number circle
     doc.setFillColor(...MUTED_CIRCLE)
     doc.circle(col.num, y + rowH / 2, 3.2, 'F')
-    doc.setFont('helvetica', 'bold')
+    doc.setFont('Inter', 'bold')
     doc.setFontSize(7.5)
     doc.setTextColor(...WARM_GRAY)
     doc.text(String(idx + 1), col.num, mid, { align: 'center' })
 
     // Description
-    doc.setFont('helvetica', 'normal')
+    doc.setFont('Inter', 'normal')
     doc.setFontSize(9.5)
     doc.setTextColor(...NEAR_BLACK)
     const descText = item.name || 'Item'
@@ -202,36 +227,32 @@ export function generateQuotePdf(data: PdfQuoteData) {
 
     if (item.isOffered) {
       const dw = doc.getTextWidth(descText)
-      doc.setFont('helvetica', 'italic')
-      doc.setFontSize(8)
+      doc.setFont('Cormorant', 'italic')
+      doc.setFontSize(9)
       doc.setTextColor(...GOLD)
-      doc.text(' - Offert', col.desc + dw, mid)
+      doc.text(' — Offert', col.desc + dw, mid)
 
-      // Dash in total
-      doc.setFont('helvetica', 'normal')
+      doc.setFont('Inter', 'normal')
       doc.setFontSize(9.5)
       doc.setTextColor(...WARM_GRAY)
       doc.text('—', col.total, mid, { align: 'right' })
     } else {
-      // Qty
-      doc.setFont('helvetica', 'normal')
+      doc.setFont('Inter', 'normal')
       doc.setFontSize(9.5)
       doc.setTextColor(...NEAR_BLACK)
       doc.text(item.hideQty ? '—' : String(item.quantity), col.qty, mid, { align: 'right' })
 
-      // Unit price
       doc.text('NIS ' + fmtNIS(item.unitPrice), col.price, mid, { align: 'right' })
 
-      // Line total
       const lt = item.quantity * item.unitPrice
-      doc.setFont('helvetica', 'bold')
+      doc.setFont('Inter', 'bold')
       doc.text('NIS ' + fmtNIS(lt), col.total, mid, { align: 'right' })
     }
 
     y += rowH
   })
 
-  // Bottom border of table
+  // Bottom table border
   doc.setDrawColor(...DIVIDER)
   doc.setLineWidth(0.15)
   doc.line(mL, y, rightEdge, y)
@@ -242,29 +263,27 @@ export function generateQuotePdf(data: PdfQuoteData) {
   const totL = rightEdge - totW
 
   // Subtotal
-  doc.setFont('helvetica', 'normal')
+  doc.setFont('Inter', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...WARM_GRAY)
   doc.text('Subtotal', totL, y)
-  doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
   doc.setTextColor(...NEAR_BLACK)
   doc.text('NIS ' + fmtNIS(data.subtotal), rightEdge, y, { align: 'right' })
 
-  // Discount (use plain minus sign, not unicode)
+  // Discount
   if (data.discountAmount > 0) {
     y += 7
-    doc.setFont('helvetica', 'normal')
+    doc.setFont('Inter', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(...WARM_GRAY)
     doc.text(data.discountLabel || 'Discount', totL, y)
-    doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
     doc.setTextColor(...DISC_RED)
     doc.text('-NIS ' + fmtNIS(data.discountAmount), rightEdge, y, { align: 'right' })
   }
 
-  // Hairline above total
+  // Hairline
   y += 6
   doc.setDrawColor(...DIVIDER)
   doc.setLineWidth(0.15)
@@ -277,25 +296,23 @@ export function generateQuotePdf(data: PdfQuoteData) {
   doc.roundedRect(totL, y, totW, boxH, 3, 3, 'F')
 
   // TOTAL label
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('Inter', 'bold')
   doc.setFontSize(8)
   doc.setTextColor(...PAGE_BG)
   doc.text('TOTAL', totL + 8, y + 9)
 
-  // Amount — NIS in gold, number in white
+  // Total amount
   const totalStr = fmtNIS(data.total)
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('Inter', 'bold')
   doc.setFontSize(18)
-  // Measure the number width to position NIS prefix
   const numW = doc.getTextWidth(totalStr)
   const numX = rightEdge - 6
 
-  // Number
   doc.setTextColor(...PAGE_BG)
   doc.text(totalStr, numX, y + 10, { align: 'right' })
 
-  // NIS prefix in gold, just left of number
-  doc.setFont('helvetica', 'normal')
+  // NIS prefix in gold
+  doc.setFont('Inter', 'normal')
   doc.setFontSize(10)
   doc.setTextColor(...GOLD)
   doc.text('NIS', numX - numW - 3, y + 9)
@@ -306,12 +323,13 @@ export function generateQuotePdf(data: PdfQuoteData) {
   doc.setLineWidth(0.15)
   doc.line(mL, fY, rightEdge, fY)
 
-  doc.setFont('helvetica', 'italic')
-  doc.setFontSize(10)
+  // Thank you in Cormorant Italic
+  doc.setFont('Cormorant', 'italic')
+  doc.setFontSize(11)
   doc.setTextColor(...GOLD)
   doc.text('Thank you for choosing Paperly Studio', mL, fY + 8)
 
-  doc.setFont('helvetica', 'normal')
+  doc.setFont('Inter', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(...WARM_GRAY)
   doc.text('paperly.com', rightEdge, fY + 8, { align: 'right' })

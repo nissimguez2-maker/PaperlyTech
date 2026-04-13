@@ -9,6 +9,7 @@ import { ProjectDetailPage } from '@/pages/project-detail'
 import { FinancePage } from '@/pages/finance'
 import { TasksPage } from '@/pages/tasks'
 import { ExpensesPage } from '@/pages/expenses'
+import { ClientsPage } from '@/pages/clients'
 import { CatalogPage } from '@/pages/catalog'
 import { SuppliersPage } from '@/pages/suppliers'
 import { SettingsPage } from '@/pages/settings'
@@ -63,6 +64,7 @@ function ProtectedRoutes() {
         <Route path="finance" element={<FinancePage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
+        <Route path="clients" element={<ClientsPage />} />
         <Route path="catalog" element={
           <CatalogPage
             categories={categories}
