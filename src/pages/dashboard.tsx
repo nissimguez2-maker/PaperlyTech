@@ -1,14 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  TrendingUp, TrendingDown, Clock, AlertCircle,
-  ArrowRight, Plus, CalendarDays,
+  TrendingUp, TrendingDown, Clock, AlertCircle, DollarSign,
+  ArrowRight, Plus, CalendarDays, Circle,
 } from 'lucide-react'
 import { Card, CardTitle } from '@/components/ui/card'
 import { PipelineBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/page-header'
-import { fmtCurrency, fmtDate } from '@/lib/utils'
+import { useToast } from '@/components/ui/toast'
+import { fmtCurrency, fmtDate, cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import type { Project, Payment, Expense, Task } from '@/types/database'
 
@@ -20,18 +21,25 @@ interface DashboardData {
 }
 
 export function DashboardPage() {
+  const { toast } = useToast()
   const [data, setData] = useState<DashboardData>({
     projects: [], payments: [], expenses: [], tasks: [],
   })
   const [loading, setLoading] = useState(true)
 
+  // Quick-add task
+  const [showQuickTask, setShowQuickTask] = useState(false)
+  const [quickTaskTitle, setQuickTaskTitle] = useState('')
+
+  const currentMonth = new Date().toISOString().slice(0, 7)
+
   useEffect(() => {
     async function load() {
       const [pRes, payRes, expRes, taskRes] = await Promise.all([
         supabase.from('projects').select('*, client:clients(name)').order('created_at', { ascending: false }),
-        supabase.from('payments').select('*').order('date', { ascending: false }).limit(10),
-        supabase.from('expenses').select('*').order('date', { ascending: false }).limit(10),
-        supabase.from('tasks').select('*').eq('completed', false).order('due_date', { ascending: true }).limit(10),
+        supabase.from('payments').select('*').gte('date', currentMonth + '-01').order('date', { ascending: false }),
+        supabase.from('expenses').select('*').gte('date', currentMonth + '-01').order('date', { ascending: false }),
+        supabase.from('tasks').select('*, project:projects(name, client:clients(name))').eq('completed', false).order('due_date', { ascending: true }).limit(10),
       ])
       setData({
         projects: pRes.data ?? [],
@@ -42,9 +50,41 @@ export function DashboardPage() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [currentMonth])
 
-  const activeProjects = data.projects.filter(p => !['paid', 'lead'].includes(p.pipeline_stage))
+  const toggleTask = useCallback(async (id: string) => {
+    setData(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(t => t.id === id ? { ...t, completed: true } : t),
+    }))
+    const { error } = await supabase.from('tasks').update({ completed: true }).eq('id', id)
+    if (error) {
+      toast('Failed to update task', 'error')
+      setData(prev => ({
+        ...prev,
+        tasks: prev.tasks.map(t => t.id === id ? { ...t, completed: false } : t),
+      }))
+    }
+  }, [toast])
+
+  const addQuickTask = useCallback(async () => {
+    if (!quickTaskTitle.trim()) return
+    const { data: saved, error } = await supabase.from('tasks').insert({
+      title: quickTaskTitle.trim(),
+      completed: false,
+      priority: 'medium',
+    }).select('*').single()
+    if (error || !saved) {
+      toast('Failed to add task', 'error')
+      return
+    }
+    setData(prev => ({ ...prev, tasks: [saved as Task, ...prev.tasks] }))
+    setQuickTaskTitle('')
+    setShowQuickTask(false)
+    toast('Task added')
+  }, [quickTaskTitle, toast])
+
+  const activeProjects = data.projects.filter(p => !['paid'].includes(p.pipeline_stage))
   const recentPayments = data.payments.slice(0, 5)
   const pendingTasks = data.tasks.filter(t => !t.completed)
   const overdueProjects = activeProjects.filter(p =>
@@ -52,12 +92,14 @@ export function DashboardPage() {
   )
 
   const thisMonthRevenue = data.payments
-    .filter(p => p.date.startsWith(new Date().toISOString().slice(0, 7)))
+    .filter(p => p.date.startsWith(currentMonth))
     .reduce((sum, p) => sum + p.amount, 0)
 
   const thisMonthExpenses = data.expenses
-    .filter(e => e.date.startsWith(new Date().toISOString().slice(0, 7)))
+    .filter(e => e.date.startsWith(currentMonth))
     .reduce((sum, e) => sum + e.amount, 0)
+
+  const thisMonthNet = thisMonthRevenue - thisMonthExpenses
 
   if (loading) {
     return (
@@ -83,7 +125,7 @@ export function DashboardPage() {
       />
 
       {/* KPI Cards */}
-      <div className="mb-8 grid grid-cols-4 gap-4">
+      <div className="mb-8 grid grid-cols-5 gap-4">
         <Card>
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-forest-bg p-2.5">
@@ -91,7 +133,7 @@ export function DashboardPage() {
             </div>
             <div>
               <p className="text-xs font-medium text-muted">Revenue (this month)</p>
-              <p className="font-display text-2xl font-bold text-bark">{fmtCurrency(thisMonthRevenue)}</p>
+              <p className="font-display text-2xl font-bold text-bark" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(thisMonthRevenue)}</p>
             </div>
           </div>
         </Card>
@@ -103,7 +145,21 @@ export function DashboardPage() {
             </div>
             <div>
               <p className="text-xs font-medium text-muted">Expenses (this month)</p>
-              <p className="font-display text-2xl font-bold text-bark">{fmtCurrency(thisMonthExpenses)}</p>
+              <p className="font-display text-2xl font-bold text-bark" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(thisMonthExpenses)}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="flex items-center gap-3">
+            <div className={`rounded-xl p-2.5 ${thisMonthNet >= 0 ? 'bg-forest-bg' : 'bg-coral-bg'}`}>
+              <DollarSign size={20} className={thisMonthNet >= 0 ? 'text-forest' : 'text-coral'} />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted">Net (this month)</p>
+              <p className={cn('font-display text-2xl font-bold', thisMonthNet >= 0 ? 'text-forest' : 'text-coral')} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {thisMonthNet >= 0 ? '+' : ''}{fmtCurrency(thisMonthNet)}
+              </p>
             </div>
           </div>
         </Card>
@@ -179,30 +235,66 @@ export function DashboardPage() {
 
         {/* Sidebar: Tasks + Recent payments */}
         <div className="col-span-2 space-y-6">
-          {/* Pending tasks */}
+          {/* Pending tasks - INTERACTIVE */}
           <Card>
             <div className="mb-4 flex items-center justify-between">
               <CardTitle>To Do</CardTitle>
-              <Link to="/tasks" className="flex items-center gap-1 text-xs font-medium text-gold-dark hover:underline">
-                View all <ArrowRight size={12} />
-              </Link>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowQuickTask(!showQuickTask)}
+                  className="flex items-center gap-1 text-xs font-medium text-gold-dark hover:underline"
+                >
+                  <Plus size={12} /> Add
+                </button>
+                <Link to="/tasks" className="flex items-center gap-1 text-xs font-medium text-gold-dark hover:underline">
+                  View all <ArrowRight size={12} />
+                </Link>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              {pendingTasks.slice(0, 5).map(t => (
-                <div
-                  key={t.id}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-cream transition-colors"
-                >
-                  <div className="h-4 w-4 rounded border border-sand" />
-                  <div className="flex-1">
-                    <p className="text-sm text-bark">{t.title}</p>
-                    {t.due_date && (
-                      <p className="text-[10px] text-muted">{fmtDate(t.due_date)}</p>
-                    )}
+            {showQuickTask && (
+              <div className="mb-3 flex gap-2">
+                <input
+                  value={quickTaskTitle}
+                  onChange={e => setQuickTaskTitle(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addQuickTask(); if (e.key === 'Escape') setShowQuickTask(false) }}
+                  placeholder="Quick task..."
+                  className="flex-1 rounded-lg border border-sand bg-white px-3 py-2 text-sm focus:border-gold-dark focus:outline-none"
+                  autoFocus
+                />
+                <Button variant="primary" size="sm" onClick={addQuickTask}>Add</Button>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              {pendingTasks.slice(0, 7).map(t => {
+                const proj = (t as unknown as Record<string, unknown>).project as { name: string; client: { name: string } | null } | undefined
+                return (
+                  <div
+                    key={t.id}
+                    className="group flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-cream transition-colors"
+                  >
+                    <button
+                      onClick={() => toggleTask(t.id)}
+                      className="text-sand hover:text-forest transition-colors"
+                      aria-label="Mark complete"
+                    >
+                      <Circle size={18} />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-bark truncate">{t.title}</p>
+                      <div className="flex items-center gap-2">
+                        {t.due_date && (
+                          <p className="text-[10px] text-muted">{fmtDate(t.due_date)}</p>
+                        )}
+                        {proj?.client?.name && (
+                          <p className="text-[10px] text-gold-dark">{proj.client.name}</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
 
               {pendingTasks.length === 0 && (
                 <p className="py-4 text-center text-sm text-muted">All caught up!</p>
@@ -210,7 +302,7 @@ export function DashboardPage() {
             </div>
           </Card>
 
-          {/* Recent payments */}
+          {/* Recent payments — with project/client name */}
           <Card>
             <div className="mb-4 flex items-center justify-between">
               <CardTitle>Recent Payments</CardTitle>
@@ -227,8 +319,9 @@ export function DashboardPage() {
                 >
                   <div>
                     <p className="text-xs text-muted">{fmtDate(p.date)}</p>
+                    {p.note && <p className="text-[10px] text-muted truncate max-w-[160px]">{p.note}</p>}
                   </div>
-                  <span className="font-display text-sm font-bold text-forest">
+                  <span className="font-display text-sm font-bold text-forest" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     +{fmtCurrency(p.amount)}
                   </span>
                 </div>

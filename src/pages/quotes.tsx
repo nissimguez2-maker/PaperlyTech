@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
   Plus, Trash2, GripVertical, Gift, Eye, EyeOff, Download, Save,
 } from 'lucide-react'
@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Modal } from '@/components/ui/modal'
 import { useToast } from '@/components/ui/toast'
 import { uid, fmtCurrency, safeFloat, cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -28,6 +29,11 @@ interface QuotePageProps {
   articles: Article[]
 }
 
+interface ClientSuggestion {
+  id: string
+  name: string
+}
+
 export function QuotesPage({ categories, articles }: QuotePageProps) {
   const { toast } = useToast()
 
@@ -40,6 +46,40 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
   const [saving, setSaving] = useState(false)
 
   const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
+
+  // Client autocomplete
+  const [allClients, setAllClients] = useState<ClientSuggestion[]>([])
+  const [showClientDropdown, setShowClientDropdown] = useState(false)
+  const clientRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    async function loadClients() {
+      const { data } = await supabase.from('clients').select('id, name').order('name')
+      setAllClients(data ?? [])
+    }
+    loadClients()
+  }, [])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (clientRef.current && !clientRef.current.contains(e.target as Node)) {
+        setShowClientDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const filteredClients = useMemo(() => {
+    if (!client.trim()) return allClients
+    const q = client.toLowerCase()
+    return allClients.filter(c => c.name.toLowerCase().includes(q))
+  }, [client, allClients])
+
+  // Article search filter
+  const [articleSearch, setArticleSearch] = useState<Record<string, string>>({})
 
   const articleOptions = useMemo(() => {
     const parents = categories.filter(c => !c.parent_id)
@@ -67,9 +107,11 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
     0),
   [items])
 
+  // Discount validation: cap % at 100
+  const clampedDiscVal = discMode === 'pct' ? Math.min(safeFloat(discVal), 100) : safeFloat(discVal)
   const discAmount = discMode === 'pct'
-    ? subtotal * safeFloat(discVal) / 100
-    : safeFloat(discVal)
+    ? subtotal * clampedDiscVal / 100
+    : clampedDiscVal
 
   const total = Math.max(0, subtotal - discAmount)
 
@@ -112,6 +154,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
     setItems([])
     setDiscMode('pct')
     setDiscVal('')
+    setShowClearConfirm(false)
   }
 
   const exportPdf = () => {
@@ -176,12 +219,18 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         clientId = newClient.id
       }
 
+      // Build project name: "Client - Mon YYYY" or with delivery date
+      const dateLabel = deliveryDate
+        ? new Date(deliveryDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+        : new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      const projectName = client.trim() + ' - ' + dateLabel
+
       // Create project
       const { data: project, error: projErr } = await supabase
         .from('projects')
         .insert({
           client_id: clientId,
-          name: client.trim() + ' - Quote',
+          name: projectName,
           delivery_date: deliveryDate || null,
           pipeline_stage: 'quoted',
           notes: notes || null,
@@ -223,7 +272,11 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
       const { error: itemsErr } = await supabase.from('quote_items').insert(quoteItems)
       if (itemsErr) throw new Error('Failed to create quote items')
 
-      toast('Project created successfully!')
+      // Refresh client list in case a new client was added
+      const { data: refreshedClients } = await supabase.from('clients').select('id, name').order('name')
+      if (refreshedClients) setAllClients(refreshedClients)
+
+      toast('Project created: ' + projectName)
       clearQuote()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Failed to save project', 'error')
@@ -239,7 +292,13 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         subtitle="Create a quote for a client"
         actions={
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={clearQuote}>Clear</Button>
+            <Button variant="ghost" onClick={() => {
+              if (items.length > 0 || client.trim()) {
+                setShowClearConfirm(true)
+              } else {
+                clearQuote()
+              }
+            }}>Clear</Button>
             <Button variant="primary" onClick={exportPdf}>
               <Download size={16} />
               Export PDF
@@ -252,7 +311,33 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         <div className="col-span-2 space-y-6">
           <Card>
             <div className="grid grid-cols-3 gap-4">
-              <Input label="Client Name" value={client} onChange={e => setClient(e.target.value)} placeholder="e.g. Sarah & David" />
+              {/* Client autocomplete combo-box */}
+              <div ref={clientRef} className="relative">
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">Client Name</label>
+                <input
+                  value={client}
+                  onChange={e => { setClient(e.target.value); setShowClientDropdown(true) }}
+                  onFocus={() => setShowClientDropdown(true)}
+                  placeholder="Type to search or create..."
+                  className="w-full rounded-xl border border-sand bg-white px-3 py-2.5 text-sm focus:border-gold-dark focus:outline-none"
+                />
+                {showClientDropdown && filteredClients.length > 0 && (
+                  <div className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-sand bg-white py-1 shadow-lg">
+                    {filteredClients.map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => { setClient(c.name); setShowClientDropdown(false) }}
+                        className={cn(
+                          'w-full px-3 py-2 text-left text-sm transition-colors hover:bg-cream',
+                          c.name === client.trim() ? 'bg-cream font-semibold text-bark' : 'text-muted',
+                        )}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <Input label="Delivery Date" type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} />
               <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes..." />
             </div>
@@ -282,6 +367,12 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
             <div className="space-y-1">
               {items.map((item, idx) => {
                 const lineTotal = item.isOffered ? 0 : safeFloat(item.qty) * safeFloat(item.unitPrice)
+                const searchKey = item.id
+                const searchVal = articleSearch[searchKey] ?? ''
+                const filteredArticles = searchVal.trim()
+                  ? articleOptions.filter(o => o.label.toLowerCase().includes(searchVal.toLowerCase()))
+                  : articleOptions
+
                 return (
                   <div
                     key={item.id}
@@ -304,16 +395,32 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                       placeholder="Description"
                     />
 
-                    <select
-                      value={item.articleId}
-                      onChange={e => handleArticleChange(item.id, e.target.value)}
-                      className="w-full appearance-none rounded border border-sand/60 bg-white px-2 py-1.5 text-xs focus:border-gold-dark focus:outline-none"
-                    >
-                      <option value="">Select article...</option>
-                      {articleOptions.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <input
+                        value={searchVal}
+                        onChange={e => setArticleSearch(prev => ({ ...prev, [searchKey]: e.target.value }))}
+                        onFocus={() => setArticleSearch(prev => ({ ...prev, [searchKey]: prev[searchKey] ?? '' }))}
+                        placeholder={item.articleId ? articleOptions.find(o => o.value === item.articleId)?.label ?? 'Search article...' : 'Search article...'}
+                        className="w-full rounded border border-sand/60 bg-white px-2 py-1.5 text-xs focus:border-gold-dark focus:outline-none"
+                      />
+                      {(searchVal !== undefined && document.activeElement?.closest('.relative')?.contains(document.activeElement)) && filteredArticles.length > 0 && searchVal.trim() && (
+                        <div className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border border-sand bg-white py-1 shadow-lg">
+                          {filteredArticles.slice(0, 15).map(o => (
+                            <button
+                              key={o.value}
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                handleArticleChange(item.id, o.value)
+                                setArticleSearch(prev => ({ ...prev, [searchKey]: '' }))
+                              }}
+                              className="w-full px-2 py-1.5 text-left text-xs text-muted hover:bg-cream hover:text-bark transition-colors"
+                            >
+                              {o.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
                     <input
                       type="number"
@@ -411,13 +518,21 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                     NIS
                   </button>
                 </div>
-                <input
-                  type="number"
-                  value={discVal}
-                  onChange={e => setDiscVal(e.target.value)}
-                  className="flex-1 rounded-lg border border-sand bg-white px-3 py-1.5 text-sm focus:border-gold-dark focus:outline-none"
-                  placeholder="0"
-                />
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    value={discVal}
+                    onChange={e => setDiscVal(e.target.value)}
+                    className={cn(
+                      'w-full rounded-lg border bg-white px-3 py-1.5 text-sm focus:border-gold-dark focus:outline-none',
+                      discMode === 'pct' && safeFloat(discVal) > 100 ? 'border-coral' : 'border-sand',
+                    )}
+                    placeholder="0"
+                  />
+                  {discMode === 'pct' && safeFloat(discVal) > 100 && (
+                    <p className="absolute -bottom-4 left-0 text-[10px] text-coral">Max 100%</p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -453,6 +568,15 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
           </Card>
         </div>
       </div>
+
+      {/* Clear confirmation modal */}
+      <Modal open={showClearConfirm} onClose={() => setShowClearConfirm(false)} title="Clear this quote?" width="sm">
+        <p className="text-sm text-muted mb-6">This will remove all items, client info, and discount. This cannot be undone.</p>
+        <div className="flex gap-3 justify-end">
+          <Button variant="ghost" onClick={() => setShowClearConfirm(false)}>Cancel</Button>
+          <Button variant="primary" onClick={clearQuote} className="bg-coral hover:bg-coral/90">Clear Quote</Button>
+        </div>
+      </Modal>
     </div>
   )
 }
