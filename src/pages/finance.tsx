@@ -5,11 +5,13 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardTitle } from '@/components/ui/card'
-import { fmtCurrency, fmtMonth, cn } from '@/lib/utils'
+import { useToast } from '@/components/ui/toast'
+import { fmtCurrency, fmtMonth, fmtDate, cn, PAYMENT_METHODS } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import type { Payment, Expense, Project } from '@/types/database'
 
 export function FinancePage() {
+  const { toast } = useToast()
   const [payments, setPayments] = useState<Payment[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -164,12 +166,16 @@ export function FinancePage() {
 
                   {expandedMonths.has(m.month) && (
                     <div className="ml-10 mb-2 space-y-1 rounded-xl bg-cream p-3">
-                      {payments.filter(p => p.date.startsWith(m.month)).map(p => (
-                        <div key={p.id} className="flex justify-between text-xs">
-                          <span className="text-muted">{p.date}</span>
-                          <span className="text-forest font-medium">+{fmtCurrency(p.amount)}</span>
-                        </div>
-                      ))}
+                      {payments.filter(p => p.date.startsWith(m.month)).map(p => {
+                        const proj = projects.find(pr => pr.id === p.project_id)
+                        const clientName = (proj?.client as { name: string } | null)?.name
+                        return (
+                          <div key={p.id} className="flex justify-between text-xs">
+                            <span className="text-muted">{fmtDate(p.date)}{clientName ? ' - ' + clientName : ''}{p.note ? ' (' + p.note + ')' : ''}</span>
+                            <span className="text-forest font-medium">+{fmtCurrency(p.amount)}</span>
+                          </div>
+                        )
+                      })}
                       {expenses.filter(e => e.date.startsWith(m.month)).map(e => (
                         <div key={e.id} className="flex justify-between text-xs">
                           <span className="text-muted">{e.date} - {e.description}</span>
@@ -198,7 +204,7 @@ export function FinancePage() {
                 return (
                   <div key={method}>
                     <div className="mb-1 flex justify-between text-xs">
-                      <span className="font-medium text-bark capitalize">{method.replace('_', ' ')}</span>
+                      <span className="font-medium text-bark capitalize">{PAYMENT_METHODS[method as keyof typeof PAYMENT_METHODS] ?? method.replace(/_/g, ' ')}</span>
                       <span className="text-muted">{pct.toFixed(0)}%</span>
                     </div>
                     <div className="h-2 rounded-full bg-cream-dark">
@@ -221,7 +227,15 @@ export function FinancePage() {
               {projects.filter(p => !p.sumit_done).slice(0, 5).map(p => (
                 <div key={p.id} className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-cream transition-colors">
                   <span className="text-xs text-bark">{p.name}</span>
-                  <button className="rounded-lg bg-forest-bg px-2 py-1 text-[10px] font-medium text-forest hover:bg-forest-dot/30 transition-colors">
+                  <button
+                    onClick={async () => {
+                      const { error } = await supabase.from('projects').update({ sumit_done: true }).eq('id', p.id)
+                      if (error) { toast('Failed: ' + error.message, 'error'); return }
+                      setProjects(prev => prev.map(x => x.id === p.id ? { ...x, sumit_done: true } : x))
+                      toast('Marked as done in Sumit')
+                    }}
+                    className="rounded-lg bg-forest-bg px-2 py-1 text-[10px] font-medium text-forest hover:bg-forest-dot/30 transition-colors"
+                  >
                     <CheckCircle size={12} className="inline mr-1" />
                     Mark done
                   </button>

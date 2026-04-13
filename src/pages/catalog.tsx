@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useToast } from '@/components/ui/toast'
-import { fmtCurrency, cn, uid, safeFloat } from '@/lib/utils'
+import { fmtCurrency, cn, safeFloat } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import type { Category, Article } from '@/types/database'
 
@@ -34,65 +34,71 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
     })
   }
 
-  const addTopCategory = useCallback(() => {
+  const addTopCategory = useCallback(async () => {
     const name = prompt('Category name:')
     if (!name?.trim()) return
-    const newCat: Category = { id: uid(), name: name.trim(), parent_id: null }
-    onUpdateCategories([...categories, newCat])
-    supabase.from('categories').insert(newCat)
+    const { data, error } = await supabase.from('categories').insert({ name: name.trim(), parent_id: null }).select().single()
+    if (error || !data) { toast('Failed to add category: ' + (error?.message ?? 'unknown'), 'error'); return }
+    onUpdateCategories([...categories, data as Category])
     toast('Category added')
   }, [categories, onUpdateCategories, toast])
 
-  const addSubCategory = useCallback((parentId: string) => {
+  const addSubCategory = useCallback(async (parentId: string) => {
     const name = prompt('Sub-category name:')
     if (!name?.trim()) return
-    const newCat: Category = { id: uid(), name: name.trim(), parent_id: parentId }
-    onUpdateCategories([...categories, newCat])
-    supabase.from('categories').insert(newCat)
+    const { data, error } = await supabase.from('categories').insert({ name: name.trim(), parent_id: parentId }).select().single()
+    if (error || !data) { toast('Failed to add sub-category: ' + (error?.message ?? 'unknown'), 'error'); return }
+    onUpdateCategories([...categories, data as Category])
     toast('Sub-category added')
   }, [categories, onUpdateCategories, toast])
 
-  const addArticle = useCallback((catId: string) => {
+  const addArticle = useCallback(async (catId: string) => {
     const name = prompt('Article name:')
     if (!name?.trim()) return
     const price = prompt('Price:')
-    const newArt: Article = { id: uid(), category_id: catId, name: name.trim(), price: parseFloat(price ?? '0') || 0, note: null }
-    onUpdateArticles([...articles, newArt])
-    supabase.from('articles').insert(newArt)
+    const { data, error } = await supabase.from('articles').insert({ category_id: catId, name: name.trim(), price: parseFloat(price ?? '0') || 0, note: null }).select().single()
+    if (error || !data) { toast('Failed to add article: ' + (error?.message ?? 'unknown'), 'error'); return }
+    onUpdateArticles([...articles, data as Article])
     toast('Article added')
   }, [articles, onUpdateArticles, toast])
 
-  const deleteCategory = useCallback((id: string) => {
+  const deleteCategory = useCallback(async (id: string) => {
     if (!confirm('Delete this category and all its contents?')) return
     const desc = getAllDescendants(id, categories)
-    onUpdateCategories(categories.filter(c => c.id !== id && !desc.includes(c.id)))
-    onUpdateArticles(articles.filter(a => a.category_id !== id && !desc.includes(a.category_id)))
-    supabase.from('categories').delete().eq('id', id)
-    desc.forEach(d => supabase.from('categories').delete().eq('id', d))
-    toast('Category deleted')
+    const allIds = [id, ...desc]
+    onUpdateCategories(categories.filter(c => !allIds.includes(c.id)))
+    onUpdateArticles(articles.filter(a => !allIds.includes(a.category_id)))
+    // Delete articles in these categories first, then categories
+    await supabase.from('articles').delete().in('category_id', allIds)
+    const { error } = await supabase.from('categories').delete().in('id', allIds)
+    if (error) toast('Failed to delete: ' + error.message, 'error')
+    else toast('Category deleted')
   }, [categories, articles, onUpdateCategories, onUpdateArticles, toast])
 
-  const deleteArticle = useCallback((id: string) => {
+  const deleteArticle = useCallback(async (id: string) => {
     onUpdateArticles(articles.filter(a => a.id !== id))
-    supabase.from('articles').delete().eq('id', id)
-    toast('Article deleted')
+    const { error } = await supabase.from('articles').delete().eq('id', id)
+    if (error) toast('Failed to delete: ' + error.message, 'error')
+    else toast('Article deleted')
   }, [articles, onUpdateArticles, toast])
 
-  const saveCatEdit = useCallback(() => {
+  const saveCatEdit = useCallback(async () => {
     if (!editingCat || !editingCat.name.trim()) return
     onUpdateCategories(categories.map(c => c.id === editingCat.id ? { ...c, name: editingCat.name.trim() } : c))
-    supabase.from('categories').update({ name: editingCat.name.trim() }).eq('id', editingCat.id)
+    const { error } = await supabase.from('categories').update({ name: editingCat.name.trim() }).eq('id', editingCat.id)
+    if (error) toast('Failed to update: ' + error.message, 'error')
+    else toast('Category updated')
     setEditingCat(null)
-    toast('Category updated')
   }, [editingCat, categories, onUpdateCategories, toast])
 
-  const saveArtEdit = useCallback(() => {
+  const saveArtEdit = useCallback(async () => {
     if (!editingArt || !editingArt.name.trim()) return
     const newPrice = safeFloat(editingArt.price)
     onUpdateArticles(articles.map(a => a.id === editingArt.id ? { ...a, name: editingArt.name.trim(), price: newPrice } : a))
-    supabase.from('articles').update({ name: editingArt.name.trim(), price: newPrice }).eq('id', editingArt.id)
+    const { error } = await supabase.from('articles').update({ name: editingArt.name.trim(), price: newPrice }).eq('id', editingArt.id)
+    if (error) toast('Failed to update: ' + error.message, 'error')
+    else toast('Article updated')
     setEditingArt(null)
-    toast('Article updated')
   }, [editingArt, articles, onUpdateArticles, toast])
 
   const topLevelCats = categories.filter(c => !c.parent_id)

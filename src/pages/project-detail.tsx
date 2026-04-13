@@ -166,15 +166,23 @@ export function ProjectDetailPage() {
     await supabase.from('projects').update({ pipeline_stage: stage }).eq('id', project.id)
 
     if (stage === 'confirmed') {
-      const taskInserts = items.filter(it => !it.isOffered).map(it => ({
-        project_id: project.id,
-        title: it.name + ' x' + it.quantity,
-        completed: false,
-        priority: 'medium' as const,
-      }))
-      if (taskInserts.length > 0) {
-        await supabase.from('tasks').insert(taskInserts)
-        toast(taskInserts.length + ' tasks created')
+      // Guard: don't duplicate tasks if they already exist
+      const { count } = await supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', project.id)
+
+      if (!count || count === 0) {
+        const taskInserts = items.filter(it => !it.isOffered).map(it => ({
+          project_id: project.id,
+          title: it.name + ' x' + it.quantity,
+          completed: false,
+          priority: 'medium' as const,
+        }))
+        if (taskInserts.length > 0) {
+          await supabase.from('tasks').insert(taskInserts)
+          toast(taskInserts.length + ' tasks created')
+        }
       }
     }
 

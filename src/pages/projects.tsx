@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Plus, Search, Filter, CalendarDays, ChevronRight, ChevronDown,
 } from 'lucide-react'
@@ -22,6 +22,7 @@ interface ProjectWithFinance extends Project {
 const STAGES = Object.keys(PIPELINE_STAGES) as PipelineStage[]
 
 export function ProjectsPage() {
+  const navigate = useNavigate()
   const { toast } = useToast()
   const [projects, setProjects] = useState<ProjectWithFinance[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,20 +65,28 @@ export function ProjectsPage() {
     await supabase.from('projects').update({ pipeline_stage: newStage }).eq('id', projectId)
 
     if (newStage === 'confirmed') {
-      const { data: qItems } = await supabase
-        .from('quote_items')
-        .select('name, quantity, quotes!inner(project_id)')
-        .eq('quotes.project_id', projectId)
+      // Guard: don't duplicate tasks if they already exist
+      const { count } = await supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', projectId)
 
-      if (qItems && qItems.length > 0) {
-        const taskInserts = qItems.map((qi: Record<string, unknown>) => ({
-          project_id: projectId,
-          title: String(qi.name) + ' x' + String(qi.quantity),
-          completed: false,
-          priority: 'medium' as const,
-        }))
-        await supabase.from('tasks').insert(taskInserts)
-        toast(taskInserts.length + ' tasks created')
+      if (!count || count === 0) {
+        const { data: qItems } = await supabase
+          .from('quote_items')
+          .select('name, quantity, quotes!inner(project_id)')
+          .eq('quotes.project_id', projectId)
+
+        if (qItems && qItems.length > 0) {
+          const taskInserts = qItems.map((qi: Record<string, unknown>) => ({
+            project_id: projectId,
+            title: String(qi.name) + ' x' + String(qi.quantity),
+            completed: false,
+            priority: 'medium' as const,
+          }))
+          await supabase.from('tasks').insert(taskInserts)
+          toast(taskInserts.length + ' tasks created')
+        }
       }
     }
 
@@ -167,7 +176,7 @@ export function ProjectsPage() {
           icon={Filter}
           title="No projects found"
           description={search ? 'Try a different search term' : 'Create your first quote to get started'}
-          action={!search ? { label: 'New Quote', onClick: () => {} } : undefined}
+          action={!search ? { label: 'New Quote', onClick: () => navigate('/quotes') } : undefined}
         />
       ) : groupedByStage ? (
         <div className="space-y-8">
