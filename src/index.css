@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* ── Custom Paperly Theme ── */
+@theme {
+  --color-cream: #F9F8F6;
+  --color-cream-dark: #EFE9E3;
+  --color-sand: #D9CFC7;
+  --color-gold: #C9B59C;
+  --color-gold-dark: #9E8468;
+  --color-bark: #3D3530;
+  --color-muted: #9A918A;
+  --color-navy: #2C3E6B;
+  --color-navy-bg: #EEF0F7;
+  --color-navy-dot: #5B72B0;
+  --color-forest: #4A8C5C;
+  --color-forest-bg: #EEF7EE;
+  --color-forest-dot: #7DC48A;
+  --color-coral: #A05050;
+  --color-coral-bg: #f8eaea;
+
+  --font-display: "Cormorant", Georgia, serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+}
+
+/* ── Base ── */
+body {
+  font-family: var(--font-body);
+  background: var(--color-cream);
+  color: var(--color-bark);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--color-cream-dark); }
+::-webkit-scrollbar-thumb { background: var(--color-sand); border-radius: 3px; }
+
+/* ── Focus ring ── */
+*:focus-visible {
+  outline: 2px solid var(--color-gold-dark);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Headings ── */
+h1, h2, h3 {
+  font-family: var(--font-display);
+}
