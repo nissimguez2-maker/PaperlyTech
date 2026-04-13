@@ -17,7 +17,6 @@ import { supabase } from '@/lib/supabase'
 import type { Category, Article } from '@/types/database'
 
 function ProtectedRoutes() {
-  // Shared state for catalog data (used by Quotes + Catalog pages)
   const [categories, setCategories] = useState<Category[]>([])
   const [articles, setArticles] = useState<Article[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,8 +36,6 @@ function ProtectedRoutes() {
 
   const updateCategories = async (cats: Category[]) => {
     setCategories(cats)
-    // Sync to Supabase (simplified - in production, use proper upsert)
-    // For now, we just persist the full list
   }
 
   const updateArticles = async (arts: Article[]) => {

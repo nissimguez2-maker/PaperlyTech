@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import {
-  Plus, Trash2, GripVertical, Gift, Eye, EyeOff, Download,
+  Plus, Trash2, GripVertical, Gift, Eye, EyeOff, Download, Save,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
 import { uid, fmtCurrency, safeFloat, cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
-import type { Category, Article } from '@/types/database'
 import { generateQuotePdf } from '@/lib/pdf-quote'
+import type { Category, Article } from '@/types/database'
 
 interface QuoteItemLocal {
   id: string
@@ -37,26 +37,34 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
   const [items, setItems] = useState<QuoteItemLocal[]>([])
   const [discMode, setDiscMode] = useState<'pct' | 'fixed'>('pct')
   const [discVal, setDiscVal] = useState('')
-  const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
 
   const articleOptions = useMemo(() => {
     const parents = categories.filter(c => !c.parent_id)
     const result: { value: string; label: string }[] = []
+
     parents.forEach(parent => {
       const subs = categories.filter(c => c.parent_id === parent.id)
       subs.forEach(sub => {
         const arts = articles.filter(a => a.category_id === sub.id)
         arts.forEach(art => {
-          result.push({ value: art.id, label: `${parent.name} > ${sub.name} > ${art.name}` })
+          result.push({
+            value: art.id,
+            label: parent.name + ' > ' + sub.name + ' > ' + art.name,
+          })
         })
       })
     })
+
     return result
   }, [categories, articles])
 
   const subtotal = useMemo(() =>
-    items.reduce((sum, it) => it.isOffered ? sum : sum + safeFloat(it.qty) * safeFloat(it.unitPrice), 0),
+    items.reduce((sum, it) =>
+      it.isOffered ? sum : sum + safeFloat(it.qty) * safeFloat(it.unitPrice),
+    0),
   [items])
 
   const discAmount = discMode === 'pct'
@@ -106,106 +114,103 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
     setDiscVal('')
   }
 
-  // ── PDF generation ──
-  const exportPdf = async () => {
-    if (!client.trim()) { toast('Enter a client name', 'error'); return }
-    if (items.length === 0) { toast('Add at least one item', 'error'); return }
+  const exportPdf = () => {
+    if (!client.trim()) {
+      toast('Enter a client name', 'error')
+      return
+    }
+    if (items.length === 0) {
+      toast('Add at least one item', 'error')
+      return
+    }
 
-    try {
-      const pdfItems = items.map(it => ({
-        name: it.name || articleOptions.find(o => o.value === it.articleId)?.label || 'Item',
-        qty: it.qty,
+    generateQuotePdf({
+      clientName: client.trim(),
+      deliveryDate: deliveryDate || null,
+      notes: notes || null,
+      items: items.map(it => ({
+        name: it.name || 'Item',
+        description: articleOptions.find(o => o.value === it.articleId)?.label || null,
+        quantity: it.qty,
         unitPrice: safeFloat(it.unitPrice),
         isOffered: it.isOffered,
         hideQty: it.hideQty,
-      }))
+      })),
+      subtotal,
+      discountAmount: discAmount,
+      total,
+    })
 
-      const discLabel = discMode === 'pct' ? `Discount (${discVal}%)` : 'Discount'
-
-      generateQuotePdf({
-        client: client.trim(),
-        deliveryDate,
-        notes,
-        items: pdfItems,
-        subtotal,
-        discAmount,
-        discLabel,
-        total,
-      })
-
-      toast('PDF exported successfully')
-    } catch (err) {
-      console.error('PDF export error:', err)
-      toast('Failed to export PDF', 'error')
-    }
+    toast('PDF exported successfully')
   }
 
-  // ── Save as project (creates client + project + quote in Supabase) ──
   const saveAsProject = async () => {
-    if (!client.trim()) { toast('Enter a client name', 'error'); return }
-    if (items.length === 0) { toast('Add at least one item', 'error'); return }
+    if (!client.trim()) {
+      toast('Enter a client name', 'error')
+      return
+    }
+    if (items.length === 0) {
+      toast('Add at least one item', 'error')
+      return
+    }
 
     setSaving(true)
     try {
-      // 1. Upsert client
+      // Upsert client by name
       const { data: existingClients } = await supabase
         .from('clients')
         .select('id')
-        .ilike('name', client.trim())
+        .eq('name', client.trim())
         .limit(1)
 
       let clientId: string
       if (existingClients && existingClients.length > 0) {
-        clientId = (existingClients[0] as { id: string }).id
+        clientId = existingClients[0]!.id
       } else {
         const { data: newClient, error: clientErr } = await supabase
           .from('clients')
           .insert({ name: client.trim() })
           .select('id')
           .single()
-        if (clientErr || !newClient) throw clientErr || new Error('Failed to create client')
-        clientId = (newClient as { id: string }).id
+        if (clientErr || !newClient) throw new Error('Failed to create client')
+        clientId = newClient.id
       }
 
-      // 2. Create project
+      // Create project
       const { data: project, error: projErr } = await supabase
         .from('projects')
         .insert({
           client_id: clientId,
-          name: `${client.trim()} - Quote`,
+          name: client.trim() + ' - Quote',
           delivery_date: deliveryDate || null,
           pipeline_stage: 'quoted',
           notes: notes || null,
-          sumit_done: false,
         })
         .select('id')
         .single()
-      if (projErr || !project) throw projErr || new Error('Failed to create project')
-      const projectId = (project as { id: string }).id
+      if (projErr || !project) throw new Error('Failed to create project')
 
-      // 3. Create quote
+      // Create quote
       const { data: quote, error: quoteErr } = await supabase
         .from('quotes')
         .insert({
-          project_id: projectId,
+          project_id: project.id,
           version: 1,
           subtotal,
           discount_mode: discMode,
           discount_value: safeFloat(discVal),
           total,
           notes: notes || null,
-          exported_at: null,
         })
         .select('id')
         .single()
-      if (quoteErr || !quote) throw quoteErr || new Error('Failed to create quote')
-      const quoteId = (quote as { id: string }).id
+      if (quoteErr || !quote) throw new Error('Failed to create quote')
 
-      // 4. Insert quote items
+      // Create quote items
       const quoteItems = items.map((it, idx) => ({
-        quote_id: quoteId,
+        quote_id: quote.id,
         article_id: it.articleId || null,
-        name: it.name || articleOptions.find(o => o.value === it.articleId)?.label || 'Item',
+        name: it.name || 'Item',
         description: articleOptions.find(o => o.value === it.articleId)?.label || null,
         quantity: it.qty,
         unit_price: safeFloat(it.unitPrice),
@@ -216,13 +221,12 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
       }))
 
       const { error: itemsErr } = await supabase.from('quote_items').insert(quoteItems)
-      if (itemsErr) throw itemsErr
+      if (itemsErr) throw new Error('Failed to create quote items')
 
-      toast('Project and client saved!')
+      toast('Project created successfully!')
       clearQuote()
     } catch (err) {
-      console.error('Save error:', err)
-      toast('Failed to save project', 'error')
+      toast(err instanceof Error ? err.message : 'Failed to save project', 'error')
     } finally {
       setSaving(false)
     }
@@ -258,7 +262,8 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-display text-lg font-bold text-bark">Line Items</h3>
               <Button variant="primary" size="sm" onClick={addItem}>
-                <Plus size={14} /> Add Item
+                <Plus size={14} />
+                Add Item
               </Button>
             </div>
 
@@ -291,12 +296,14 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                     )}
                   >
                     <GripVertical size={14} className="cursor-grab text-sand" />
+
                     <input
                       value={item.name}
                       onChange={e => updateItem(item.id, { name: e.target.value })}
                       className="w-full rounded border border-sand/60 bg-white px-2 py-1.5 text-xs focus:border-gold-dark focus:outline-none"
                       placeholder="Description"
                     />
+
                     <select
                       value={item.articleId}
                       onChange={e => handleArticleChange(item.id, e.target.value)}
@@ -307,6 +314,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
+
                     <input
                       type="number"
                       min={1}
@@ -314,6 +322,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                       onChange={e => updateItem(item.id, { qty: safeFloat(e.target.value, 1) })}
                       className="w-full rounded border border-sand/60 bg-white px-2 py-1.5 text-center text-xs focus:border-gold-dark focus:outline-none"
                     />
+
                     <input
                       type="number"
                       step="0.01"
@@ -324,14 +333,20 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                         item.isOverride ? 'border-gold bg-gold/5' : 'border-sand/60 bg-white',
                       )}
                     />
-                    <span className={cn('text-center text-xs font-semibold', item.isOffered ? 'text-forest' : 'text-bark')}>
+
+                    <span className={cn(
+                      'text-center text-xs font-semibold',
+                      item.isOffered ? 'text-forest' : 'text-bark',
+                    )}>
                       {item.isOffered ? 'Offered' : fmtCurrency(lineTotal)}
                     </span>
+
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => updateItem(item.id, { isOffered: !item.isOffered })}
                         className={cn('rounded p-1 transition-colors', item.isOffered ? 'text-forest' : 'text-sand hover:text-muted')}
                         title={item.isOffered ? 'Remove offer' : 'Mark as offered'}
+                        aria-label={item.isOffered ? 'Remove offer' : 'Mark as offered'}
                       >
                         <Gift size={14} />
                       </button>
@@ -339,12 +354,14 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                         onClick={() => updateItem(item.id, { hideQty: !item.hideQty })}
                         className={cn('rounded p-1 transition-colors', item.hideQty ? 'text-navy' : 'text-sand hover:text-muted')}
                         title={item.hideQty ? 'Show qty in PDF' : 'Hide qty in PDF'}
+                        aria-label={item.hideQty ? 'Show qty in PDF' : 'Hide qty in PDF'}
                       >
                         {item.hideQty ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
                       <button
                         onClick={() => removeItem(item.id)}
                         className="rounded p-1 text-sand hover:text-coral transition-colors"
+                        aria-label="Remove item"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -368,18 +385,31 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         <div className="space-y-6">
           <Card className="sticky top-8">
             <h3 className="mb-4 font-display text-lg font-bold text-bark">Summary</h3>
+
             <div className="mb-4">
-              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">Discount</label>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">
+                Discount
+              </label>
               <div className="flex gap-2">
                 <div className="flex rounded-lg border border-sand overflow-hidden">
                   <button
                     onClick={() => setDiscMode('pct')}
-                    className={cn('px-3 py-1.5 text-xs font-medium transition-colors', discMode === 'pct' ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream')}
-                  >%</button>
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium transition-colors',
+                      discMode === 'pct' ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream',
+                    )}
+                  >
+                    %
+                  </button>
                   <button
                     onClick={() => setDiscMode('fixed')}
-                    className={cn('px-3 py-1.5 text-xs font-medium transition-colors', discMode === 'fixed' ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream')}
-                  >NIS</button>
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium transition-colors',
+                      discMode === 'fixed' ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream',
+                    )}
+                  >
+                    NIS
+                  </button>
                 </div>
                 <input
                   type="number"
@@ -404,15 +434,19 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
               )}
               <div className="flex justify-between border-t border-sand/40 pt-3">
                 <span className="text-sm font-semibold text-bark">Total</span>
-                <span className="font-display text-3xl font-bold text-bark">{fmtCurrency(total)}</span>
+                <span className="font-display text-3xl font-bold text-bark">
+                  {fmtCurrency(total)}
+                </span>
               </div>
             </div>
 
             <div className="mt-6 flex flex-col gap-2">
               <Button variant="primary" className="w-full" onClick={exportPdf}>
-                <Download size={16} /> Export PDF
+                <Download size={16} />
+                Export PDF
               </Button>
               <Button variant="secondary" className="w-full" onClick={saveAsProject} disabled={saving}>
+                <Save size={16} />
                 {saving ? 'Saving...' : 'Save as Project'}
               </Button>
             </div>

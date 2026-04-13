@@ -51,7 +51,6 @@ export function cn(...classes: (string | false | null | undefined)[]): string {
 export const PAYMENT_METHODS = {
   wire_transfer: 'Wire Transfer',
   cash: 'Cash',
-  bit: 'Bit',
 } as const
 
 /** Pipeline stage display config */
