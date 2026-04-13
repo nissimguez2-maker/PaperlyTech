@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import {
-  TrendingUp, TrendingDown, Wallet, CheckCircle,
+  FileText, Hammer, Wallet, CheckCircle,
   ChevronDown, ChevronRight,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
@@ -15,23 +15,50 @@ export function FinancePage() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [quotes, setQuotes] = useState<{ project_id: string; total: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     async function load() {
-      const [payRes, expRes, projRes] = await Promise.all([
+      const [payRes, expRes, projRes, quoteRes] = await Promise.all([
         supabase.from('payments').select('*').order('date', { ascending: false }),
         supabase.from('expenses').select('*').order('date', { ascending: false }),
         supabase.from('projects').select('*, client:clients(name)'),
+        supabase.from('quotes').select('project_id, total').order('version', { ascending: false }),
       ])
       setPayments(payRes.data ?? [])
       setExpenses(expRes.data ?? [])
       setProjects(projRes.data ?? [])
+      setQuotes(quoteRes.data ?? [])
       setLoading(false)
     }
     load()
   }, [])
+
+  // Get quote total for a project (latest quote)
+  const getQuoteTotal = (projectId: string): number => {
+    const q = quotes.find(q => q.project_id === projectId)
+    return q?.total ?? 0
+  }
+
+  // KPI 1: Quoted — total value of projects in "quoted" stage
+  const totalQuoted = useMemo(() => {
+    return projects
+      .filter(p => p.pipeline_stage === 'quoted')
+      .reduce((sum, p) => sum + getQuoteTotal(p.id), 0)
+  }, [projects, quotes])
+
+  // KPI 2: In the Works — total value of projects in "in_progress" stage
+  const totalInProgress = useMemo(() => {
+    return projects
+      .filter(p => p.pipeline_stage === 'in_progress')
+      .reduce((sum, p) => sum + getQuoteTotal(p.id), 0)
+  }, [projects, quotes])
+
+  // KPI 3: In My Pocket — total payments received (all time)
+  const totalCollected = payments.reduce((s, p) => s + p.amount, 0)
+  const totalExpensesAmt = expenses.reduce((s, e) => s + e.amount, 0)
 
   // Monthly aggregation
   const monthlyData = useMemo(() => {
@@ -69,11 +96,6 @@ export function FinancePage() {
     return [...methods.entries()].sort((a, b) => b[1] - a[1])
   }, [payments])
 
-  // Totals
-  const totalRevenue = payments.reduce((s, p) => s + p.amount, 0)
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0)
-  const totalProfit = totalRevenue - totalExpenses
-
   const toggleMonth = (m: string) => {
     setExpandedMonths(prev => {
       const next = new Set(prev)
@@ -91,45 +113,56 @@ export function FinancePage() {
     )
   }
 
+  const quotedCount = projects.filter(p => p.pipeline_stage === 'quoted').length
+  const inProgressCount = projects.filter(p => p.pipeline_stage === 'in_progress').length
+  const netProfit = totalCollected - totalExpensesAmt
+
   return (
     <div>
-      <PageHeader title="Finance" subtitle="Revenue, expenses and profitability" />
+      <PageHeader title="Finance" subtitle="Where your money is" />
 
-      {/* KPI row */}
+      {/* Pipeline Money KPIs */}
       <div className="mb-8 grid grid-cols-3 gap-4">
         <Card>
           <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-navy-bg p-2.5">
+              <FileText size={20} className="text-navy" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted">Quoted</p>
+              <p className="font-display text-2xl font-bold text-bark" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(totalQuoted)}</p>
+              <p className="text-[10px] text-muted">{quotedCount} project{quotedCount !== 1 ? 's' : ''} waiting for response</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-navy-bg p-2.5">
+              <Hammer size={20} className="text-navy" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted">In the Works</p>
+              <p className="font-display text-2xl font-bold text-bark" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(totalInProgress)}</p>
+              <p className="text-[10px] text-muted">{inProgressCount} project{inProgressCount !== 1 ? 's' : ''} being produced</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="flex items-center gap-3">
             <div className="rounded-xl bg-forest-bg p-2.5">
-              <TrendingUp size={20} className="text-forest" />
+              <Wallet size={20} className="text-forest" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted">Total Revenue</p>
-              <p className="font-display text-2xl font-bold text-bark">{fmtCurrency(totalRevenue)}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-coral-bg p-2.5">
-              <TrendingDown size={20} className="text-coral" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted">Total Expenses</p>
-              <p className="font-display text-2xl font-bold text-bark">{fmtCurrency(totalExpenses)}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className={`rounded-xl p-2.5 ${totalProfit >= 0 ? 'bg-forest-bg' : 'bg-coral-bg'}`}>
-              <Wallet size={20} className={totalProfit >= 0 ? 'text-forest' : 'text-coral'} />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted">Net Profit</p>
-              <p className={cn('font-display text-2xl font-bold', totalProfit >= 0 ? 'text-forest' : 'text-coral')}>
-                {fmtCurrency(totalProfit)}
+              <p className="text-xs font-medium text-muted">In My Pocket</p>
+              <p className="font-display text-2xl font-bold text-forest" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(totalCollected)}</p>
+              <p className="text-[10px] text-muted">
+                {totalExpensesAmt > 0 ? (
+                  <>after expenses: <span className={netProfit >= 0 ? 'text-forest' : 'text-coral'}>{fmtCurrency(netProfit)}</span></>
+                ) : (
+                  'total payments collected'
+                )}
               </p>
             </div>
           </div>
@@ -194,13 +227,13 @@ export function FinancePage() {
           </Card>
         </div>
 
-        {/* Payment methods donut */}
+        {/* Payment methods + Sumit */}
         <div>
           <Card>
             <CardTitle>By Payment Method</CardTitle>
             <div className="mt-4 space-y-3">
               {methodBreakdown.map(([method, amount]) => {
-                const pct = totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0
+                const pct = totalCollected > 0 ? (amount / totalCollected) * 100 : 0
                 return (
                   <div key={method}>
                     <div className="mb-1 flex justify-between text-xs">
@@ -217,6 +250,10 @@ export function FinancePage() {
                   </div>
                 )
               })}
+
+              {methodBreakdown.length === 0 && (
+                <p className="py-4 text-center text-xs text-muted">No payments yet</p>
+              )}
             </div>
           </Card>
 
