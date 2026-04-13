@@ -5,7 +5,6 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { fmtCurrency, fmtMonth, cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import type { Payment, Expense, Project } from '@/types/database'
@@ -173,7 +172,7 @@ export function FinancePage() {
                       ))}
                       {expenses.filter(e => e.date.startsWith(m.month)).map(e => (
                         <div key={e.id} className="flex justify-between text-xs">
-                          <span className="text-muted">{e.date} — {e.description}</span>
+                          <span className="text-muted">{e.date} - {e.description}</span>
                           <span className="text-coral font-medium">-{fmtCurrency(e.amount)}</span>
                         </div>
                       ))}
