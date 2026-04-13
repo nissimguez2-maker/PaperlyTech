@@ -7,9 +7,7 @@ import { QuotesPage } from '@/pages/quotes'
 import { ProjectsPage } from '@/pages/projects'
 import { ProjectDetailPage } from '@/pages/project-detail'
 import { FinancePage } from '@/pages/finance'
-import { TasksPage } from '@/pages/tasks'
 import { ExpensesPage } from '@/pages/expenses'
-import { ClientsPage } from '@/pages/clients'
 import { CatalogPage } from '@/pages/catalog'
 import { SuppliersPage } from '@/pages/suppliers'
 import { SettingsPage } from '@/pages/settings'
@@ -35,14 +33,6 @@ function ProtectedRoutes() {
     loadCatalog()
   }, [])
 
-  const updateCategories = async (cats: Category[]) => {
-    setCategories(cats)
-  }
-
-  const updateArticles = async (arts: Article[]) => {
-    setArticles(arts)
-  }
-
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-cream">
@@ -62,15 +52,13 @@ function ProtectedRoutes() {
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:id" element={<ProjectDetailPage />} />
         <Route path="finance" element={<FinancePage />} />
-        <Route path="tasks" element={<TasksPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
-        <Route path="clients" element={<ClientsPage />} />
         <Route path="catalog" element={
           <CatalogPage
             categories={categories}
             articles={articles}
-            onUpdateCategories={updateCategories}
-            onUpdateArticles={updateArticles}
+            onUpdateCategories={(cats: Category[]) => setCategories(cats)}
+            onUpdateArticles={(arts: Article[]) => setArticles(arts)}
           />
         } />
         <Route path="suppliers" element={<SuppliersPage />} />
@@ -82,7 +70,6 @@ function ProtectedRoutes() {
 
 export default function App() {
   const { user, loading } = useAuth()
-
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-cream">
@@ -90,10 +77,6 @@ export default function App() {
       </div>
     )
   }
-
-  if (!user) {
-    return <LoginPage />
-  }
-
+  if (!user) return <LoginPage />
   return <ProtectedRoutes />
 }

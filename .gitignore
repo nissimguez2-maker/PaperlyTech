@@ -1,7 +1,31 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Build
 dist/
+dist-ssr/
+*.local
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Env
 .env
 .env.local
-.DS_Store
-*.log
-.netlify/
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

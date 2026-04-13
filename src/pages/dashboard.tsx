@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   TrendingUp, TrendingDown, Clock, AlertCircle, DollarSign,
-  ArrowRight, Plus, CalendarDays, Circle,
+  ArrowRight, Plus, CalendarDays, Circle, Truck,
 } from 'lucide-react'
 import { Card, CardTitle } from '@/components/ui/card'
 import { PipelineBadge } from '@/components/ui/badge'
@@ -90,6 +90,15 @@ export function DashboardPage() {
   const overdueProjects = activeProjects.filter(p =>
     p.delivery_date && new Date(p.delivery_date) < new Date()
   )
+
+  // Next 3 upcoming deliveries: active projects with a future delivery_date, sorted nearest first
+  const nextDeliveries = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    return activeProjects
+      .filter(p => p.delivery_date && p.delivery_date >= today)
+      .sort((a, b) => (a.delivery_date ?? '').localeCompare(b.delivery_date ?? ''))
+      .slice(0, 3)
+  }, [activeProjects])
 
   const thisMonthRevenue = data.payments
     .filter(p => p.date.startsWith(currentMonth))
@@ -191,8 +200,63 @@ export function DashboardPage() {
 
       {/* Two-column layout */}
       <div className="grid grid-cols-5 gap-6">
-        {/* Active projects */}
-        <div className="col-span-3">
+        {/* Left column: Active projects + Next deliveries */}
+        <div className="col-span-3 space-y-6">
+          {/* Next Deliveries */}
+          <Card>
+            <div className="mb-4 flex items-center justify-between">
+              <CardTitle>Next Deliveries</CardTitle>
+              <Link to="/projects" className="flex items-center gap-1 text-xs font-medium text-gold-dark hover:underline">
+                View all <ArrowRight size={12} />
+              </Link>
+            </div>
+
+            {nextDeliveries.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted">No upcoming deliveries</p>
+            ) : (
+              <div className="space-y-3">
+                {nextDeliveries.map(p => {
+                  const daysLeft = Math.ceil(
+                    (new Date(p.delivery_date + 'T00:00:00').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+                  )
+                  const clientName = (p as unknown as Record<string, unknown>).client
+                    ? ((p as unknown as Record<string, unknown>).client as { name: string }).name
+                    : '-'
+                  return (
+                    <Link
+                      key={p.id}
+                      to={`/projects/${p.id}`}
+                      className="flex items-center justify-between rounded-xl border border-sand/40 px-4 py-3 hover:bg-cream transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-lg bg-gold-dark/10 p-2">
+                          <Truck size={16} className="text-gold-dark" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-bark">{p.name}</p>
+                          <p className="text-xs text-muted">{clientName}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-bark">{fmtDate(p.delivery_date!)}</p>
+                          <p className={cn(
+                            'text-[10px] font-medium',
+                            daysLeft <= 3 ? 'text-coral' : daysLeft <= 7 ? 'text-gold-dark' : 'text-muted',
+                          )}>
+                            {daysLeft === 0 ? 'Today' : daysLeft === 1 ? 'Tomorrow' : daysLeft + ' days left'}
+                          </p>
+                        </div>
+                        <PipelineBadge stage={p.pipeline_stage} />
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </Card>
+
+          {/* Active projects */}
           <Card>
             <div className="mb-4 flex items-center justify-between">
               <CardTitle>Active Projects</CardTitle>
@@ -246,7 +310,7 @@ export function DashboardPage() {
                 >
                   <Plus size={12} /> Add
                 </button>
-                <Link to="/tasks" className="flex items-center gap-1 text-xs font-medium text-gold-dark hover:underline">
+                <Link to="/projects" className="flex items-center gap-1 text-xs font-medium text-gold-dark hover:underline">
                   View all <ArrowRight size={12} />
                 </Link>
               </div>
