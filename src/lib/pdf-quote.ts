@@ -22,14 +22,14 @@ export interface PdfQuoteData {
 }
 
 // Color palette
-const PAGE_BG: [number, number, number] = [250, 248, 244]       // #FAF8F4
-const NEAR_BLACK: [number, number, number] = [44, 36, 22]       // #2C2416
-const GOLD: [number, number, number] = [184, 149, 106]          // #B8956A
-const WARM_GRAY: [number, number, number] = [154, 142, 126]     // #9A8E7E
-const LIGHT_CREAM: [number, number, number] = [242, 237, 229]   // #F2EDE5
-const DIVIDER: [number, number, number] = [212, 201, 184]       // #D4C9B8
-const DISC_RED: [number, number, number] = [192, 57, 43]        // #C0392B
-const MUTED_CIRCLE: [number, number, number] = [229, 221, 208]  // #E5DDD0
+const PAGE_BG: [number, number, number] = [250, 248, 244]
+const NEAR_BLACK: [number, number, number] = [44, 36, 22]
+const GOLD: [number, number, number] = [184, 149, 106]
+const WARM_GRAY: [number, number, number] = [154, 142, 126]
+const LIGHT_CREAM: [number, number, number] = [242, 237, 229]
+const DIVIDER: [number, number, number] = [212, 201, 184]
+const DISC_RED: [number, number, number] = [192, 57, 43]
+const MUTED_CIRCLE: [number, number, number] = [229, 221, 208]
 
 function generateQuoteRef(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -46,35 +46,33 @@ export function generateQuotePdf(data: PdfQuoteData) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const pageW = 210
   const pageH = 297
-  const mL = 18 // left margin
-  const mR = 18 // right margin
+  const mL = 18
+  const mR = 18
   const contentW = pageW - mL - mR
   const rightEdge = pageW - mR
 
-  // --- Page background ---
+  // ── Page background ──
   doc.setFillColor(...PAGE_BG)
   doc.rect(0, 0, pageW, pageH, 'F')
 
-  // --- Left gold accent line (3px = ~1mm, full height) ---
+  // ── Left gold accent stripe (2.5mm wide) ──
   doc.setFillColor(...GOLD)
-  doc.rect(0, 0, 1, pageH, 'F')
+  doc.rect(0, 0, 2.5, pageH, 'F')
 
-  // ======================== SECTION 1: HEADER ========================
-  // Left: PAPERLY STUDIO
-  // TODO: embed Cormorant Garamond for "STUDIO"
+  // ══════════════ HEADER ══════════════
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(22)
+  doc.setFontSize(24)
   doc.setTextColor(...NEAR_BLACK)
   doc.text('PAPERLY', mL, 26)
-  const paperlyW = doc.getTextWidth('PAPERLY')
+  const pw = doc.getTextWidth('PAPERLY ')
   doc.setFont('helvetica', 'italic')
-  doc.setFontSize(22)
+  doc.setFontSize(24)
   doc.setTextColor(...GOLD)
-  doc.text(' STUDIO', mL + paperlyW, 26)
+  doc.text('STUDIO', mL + pw, 26)
 
   // Tagline
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
+  doc.setFontSize(6.5)
   doc.setTextColor(...WARM_GRAY)
   doc.text('CREATIVE DIRECTION FOR PREMIUM EVENTS', mL, 32)
 
@@ -83,61 +81,58 @@ export function generateQuotePdf(data: PdfQuoteData) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(...GOLD)
-  doc.text(quoteRef, rightEdge, 24, { align: 'right' })
+  doc.text(quoteRef, rightEdge, 22, { align: 'right' })
 
   const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...WARM_GRAY)
-  doc.text(today, rightEdge, 30, { align: 'right' })
+  doc.text(today, rightEdge, 28, { align: 'right' })
 
-  // Divider hairline at y=38
+  // Hairline divider
   doc.setDrawColor(...DIVIDER)
   doc.setLineWidth(0.15)
-  doc.line(mL, 38, rightEdge, 38)
+  doc.line(mL, 36, rightEdge, 36)
 
-  // ======================== SECTION 2: DOCUMENT LABEL ========================
+  // ══════════════ QUOTE LABEL ══════════════
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(9)
   doc.setTextColor(...GOLD)
-  doc.text('QUOTE', mL, 46)
-  // Gold underline (28mm wide, 0.5pt)
+  doc.text('QUOTE', mL, 43)
   doc.setDrawColor(...GOLD)
   doc.setLineWidth(0.5)
-  doc.line(mL, 48, mL + 28, 48)
+  doc.line(mL, 45, mL + 22, 45)
 
-  // ======================== SECTION 3: CLIENT INFO BLOCK ========================
-  const clientBlockY = 52
-  const clientBlockH = data.notes ? 30 : 26
+  // ══════════════ CLIENT INFO BLOCK ══════════════
+  const cY = 50
+  const cH = data.notes ? 30 : 26
   doc.setFillColor(...LIGHT_CREAM)
-  doc.roundedRect(mL, clientBlockY, contentW, clientBlockH, 3, 3, 'F')
+  doc.roundedRect(mL, cY, contentW, cH, 3, 3, 'F')
 
-  // Left: PREPARED FOR + client name
+  const pad = 8
+
+  // Prepared for
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7)
   doc.setTextColor(...WARM_GRAY)
-  doc.text('PREPARED FOR', mL + 8, clientBlockY + 8)
-
-  // TODO: embed Cormorant Garamond Bold for client name
+  doc.text('PREPARED FOR', mL + pad, cY + 8)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(17)
+  doc.setFontSize(16)
   doc.setTextColor(...NEAR_BLACK)
-  doc.text(data.clientName, mL + 8, clientBlockY + 16)
+  doc.text(data.clientName, mL + pad, cY + 16)
 
-  // Notes below client name
   if (data.notes) {
     doc.setFont('helvetica', 'italic')
-    doc.setFontSize(9)
+    doc.setFontSize(8)
     doc.setTextColor(...WARM_GRAY)
-    doc.text(data.notes, mL + 8, clientBlockY + 23)
+    doc.text(data.notes, mL + pad, cY + 23)
   }
 
-  // Right: DELIVERY DATE
+  // Delivery date
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7)
   doc.setTextColor(...WARM_GRAY)
-  doc.text('DELIVERY DATE', 130, clientBlockY + 8)
-
+  doc.text('DELIVERY DATE', rightEdge - pad, cY + 8, { align: 'right' })
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(12)
   doc.setTextColor(...NEAR_BLACK)
@@ -145,43 +140,42 @@ export function generateQuotePdf(data: PdfQuoteData) {
     const dDate = new Date(data.deliveryDate + 'T00:00:00').toLocaleDateString('en-GB', {
       day: 'numeric', month: 'long', year: 'numeric',
     })
-    doc.text(dDate, 130, clientBlockY + 16)
+    doc.text(dDate, rightEdge - pad, cY + 16, { align: 'right' })
   } else {
-    doc.text('\u2014', 130, clientBlockY + 16)
+    doc.text('—', rightEdge - pad, cY + 16, { align: 'right' })
   }
 
-  // ======================== SECTION 4: LINE ITEMS TABLE ========================
-  let y = clientBlockY + clientBlockH + 6
+  // ══════════════ LINE ITEMS TABLE ══════════════
+  let y = cY + cH + 8
 
-  // Column positions
+  // Column X positions — adjusted for proper spacing
   const col = {
-    num: mL + 4,       // circle center
-    desc: mL + 14,
-    qty: 125,
-    price: 158,
-    total: rightEdge,
+    num: mL + 6,       // row number circle center
+    desc: mL + 16,     // description left edge
+    qty: 118,           // qty right-align point
+    price: 152,         // unit price right-align point
+    total: rightEdge,   // total right-align point
   }
 
-  // Table header (dark bar, top-only radius)
-  const headerH = 9
+  // ── Table header (dark bar) ──
+  const hdrH = 9
   doc.setFillColor(...NEAR_BLACK)
-  doc.roundedRect(mL, y, contentW, headerH, 2, 2, 'F')
-  // Fill bottom corners to make only top rounded
-  doc.rect(mL, y + headerH - 2, contentW, 2, 'F')
+  doc.roundedRect(mL, y, contentW, hdrH, 2, 2, 'F')
+  doc.rect(mL, y + hdrH - 2, contentW, 2, 'F') // square off bottom
 
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7.5)
+  doc.setFontSize(7)
   doc.setTextColor(...PAGE_BG)
-  doc.text('#', col.num, y + 6)
-  doc.text('DESCRIPTION', col.desc, y + 6)
+  doc.text('#', mL + 6, y + 6)
+  doc.text('DESCRIPTION', mL + 16, y + 6)
   doc.text('QTY', col.qty, y + 6, { align: 'right' })
   doc.text('UNIT PRICE', col.price, y + 6, { align: 'right' })
   doc.text('TOTAL', col.total, y + 6, { align: 'right' })
 
-  y += headerH
+  y += hdrH
 
-  // Item rows
-  const rowH = 10
+  // ── Item rows ──
+  const rowH = 11
   data.items.forEach((item, idx) => {
     // Alternating row fill
     if (idx % 2 === 1) {
@@ -189,132 +183,138 @@ export function generateQuotePdf(data: PdfQuoteData) {
       doc.rect(mL, y, contentW, rowH, 'F')
     }
 
-    const rowCenter = y + rowH / 2
+    const mid = y + rowH / 2 + 1
 
-    // Row number circle
+    // Row number in muted circle
     doc.setFillColor(...MUTED_CIRCLE)
-    doc.circle(col.num, rowCenter, 3, 'F')
+    doc.circle(col.num, y + rowH / 2, 3.2, 'F')
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
+    doc.setFontSize(7.5)
     doc.setTextColor(...WARM_GRAY)
-    doc.text(String(idx + 1), col.num, rowCenter + 1.2, { align: 'center' })
+    doc.text(String(idx + 1), col.num, mid, { align: 'center' })
 
     // Description
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
+    doc.setFontSize(9.5)
     doc.setTextColor(...NEAR_BLACK)
     const descText = item.name || 'Item'
-    doc.text(descText, col.desc, rowCenter + 1.2)
+    doc.text(descText, col.desc, mid)
 
     if (item.isOffered) {
-      // Append " — Offert" in italic gold
-      const descW = doc.getTextWidth(descText)
+      const dw = doc.getTextWidth(descText)
       doc.setFont('helvetica', 'italic')
       doc.setFontSize(8)
       doc.setTextColor(...GOLD)
-      doc.text(' \u2014 Offert', col.desc + descW, rowCenter + 1.2)
+      doc.text(' - Offert', col.desc + dw, mid)
 
-      // Dash in total column
+      // Dash in total
       doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      doc.setTextColor(...NEAR_BLACK)
-      doc.text('\u2014', col.total, rowCenter + 1.2, { align: 'right' })
+      doc.setFontSize(9.5)
+      doc.setTextColor(...WARM_GRAY)
+      doc.text('—', col.total, mid, { align: 'right' })
     } else {
-      // QTY
+      // Qty
       doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
+      doc.setFontSize(9.5)
       doc.setTextColor(...NEAR_BLACK)
-      if (item.hideQty) {
-        doc.text('\u2014', col.qty, rowCenter + 1.2, { align: 'right' })
-      } else {
-        doc.text(String(item.quantity), col.qty, rowCenter + 1.2, { align: 'right' })
-      }
+      doc.text(item.hideQty ? '—' : String(item.quantity), col.qty, mid, { align: 'right' })
 
       // Unit price
-      doc.text('NIS ' + fmtNIS(item.unitPrice), col.price, rowCenter + 1.2, { align: 'right' })
+      doc.text('NIS ' + fmtNIS(item.unitPrice), col.price, mid, { align: 'right' })
 
       // Line total
-      const lineTotal = item.quantity * item.unitPrice
+      const lt = item.quantity * item.unitPrice
       doc.setFont('helvetica', 'bold')
-      doc.text('NIS ' + fmtNIS(lineTotal), col.total, rowCenter + 1.2, { align: 'right' })
+      doc.text('NIS ' + fmtNIS(lt), col.total, mid, { align: 'right' })
     }
 
     y += rowH
   })
 
-  // ======================== SECTION 5: TOTALS BLOCK ========================
-  y += 8
-  const totalsBlockW = 95
-  const totalsLeft = rightEdge - totalsBlockW
+  // Bottom border of table
+  doc.setDrawColor(...DIVIDER)
+  doc.setLineWidth(0.15)
+  doc.line(mL, y, rightEdge, y)
+
+  // ══════════════ TOTALS ══════════════
+  y += 10
+  const totW = 85
+  const totL = rightEdge - totW
 
   // Subtotal
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...WARM_GRAY)
-  doc.text('Subtotal', totalsLeft, y)
+  doc.text('Subtotal', totL, y)
+  doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
   doc.setTextColor(...NEAR_BLACK)
   doc.text('NIS ' + fmtNIS(data.subtotal), rightEdge, y, { align: 'right' })
 
-  // Discount
+  // Discount (use plain minus sign, not unicode)
   if (data.discountAmount > 0) {
     y += 7
+    doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(...WARM_GRAY)
-    doc.text(data.discountLabel || 'Discount', totalsLeft, y)
+    doc.text(data.discountLabel || 'Discount', totL, y)
+    doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
     doc.setTextColor(...DISC_RED)
-    doc.text('\u2212NIS ' + fmtNIS(data.discountAmount), rightEdge, y, { align: 'right' })
+    doc.text('-NIS ' + fmtNIS(data.discountAmount), rightEdge, y, { align: 'right' })
   }
 
-  // Hairline
-  y += 5
+  // Hairline above total
+  y += 6
   doc.setDrawColor(...DIVIDER)
   doc.setLineWidth(0.15)
-  doc.line(totalsLeft, y, rightEdge, y)
+  doc.line(totL, y, rightEdge, y)
 
-  // Total box
-  y += 4
-  const totalBoxH = 14
+  // Total dark box
+  y += 5
+  const boxH = 14
   doc.setFillColor(...NEAR_BLACK)
-  doc.roundedRect(totalsLeft, y, totalsBlockW, totalBoxH, 3, 3, 'F')
+  doc.roundedRect(totL, y, totW, boxH, 3, 3, 'F')
 
+  // TOTAL label
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
   doc.setTextColor(...PAGE_BG)
-  doc.text('TOTAL', totalsLeft + 6, y + 9)
+  doc.text('TOTAL', totL + 8, y + 9)
 
-  // NIS prefix in gold
+  // Amount — NIS in gold, number in white
+  const totalStr = fmtNIS(data.total)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(18)
+  // Measure the number width to position NIS prefix
+  const numW = doc.getTextWidth(totalStr)
+  const numX = rightEdge - 6
+
+  // Number
+  doc.setTextColor(...PAGE_BG)
+  doc.text(totalStr, numX, y + 10, { align: 'right' })
+
+  // NIS prefix in gold, just left of number
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
   doc.setTextColor(...GOLD)
-  const totalStr = fmtNIS(data.total)
-  const totalW = doc.getTextWidth(totalStr) * 1.8 // estimate for larger font
-  doc.text('NIS', rightEdge - totalW - 12, y + 9.5)
+  doc.text('NIS', numX - numW - 3, y + 9)
 
-  // Amount
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(18)
-  doc.setTextColor(...PAGE_BG)
-  doc.text(totalStr, rightEdge - 4, y + 10, { align: 'right' })
-
-  // ======================== SECTION 6: FOOTER ========================
-  const footerY = 274
+  // ══════════════ FOOTER ══════════════
+  const fY = 274
   doc.setDrawColor(...DIVIDER)
   doc.setLineWidth(0.15)
-  doc.line(mL, footerY, rightEdge, footerY)
+  doc.line(mL, fY, rightEdge, fY)
 
-  // TODO: embed Cormorant Garamond Italic for thank-you line
   doc.setFont('helvetica', 'italic')
   doc.setFontSize(10)
   doc.setTextColor(...GOLD)
-  doc.text('Thank you for choosing Paperly Studio', mL, footerY + 8)
+  doc.text('Thank you for choosing Paperly Studio', mL, fY + 8)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(...WARM_GRAY)
-  doc.text('paperly.com', rightEdge, footerY + 8, { align: 'right' })
-  doc.text(today, rightEdge, footerY + 14, { align: 'right' })
+  doc.text('paperly.com', rightEdge, fY + 8, { align: 'right' })
 
   // Save
   const fileName = 'Paperly_Quote_' + data.clientName.replace(/\s+/g, '_') + '.pdf'
