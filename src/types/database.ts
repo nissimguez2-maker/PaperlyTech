@@ -83,7 +83,7 @@ export interface Client {
   updated_at: string
 }
 
-export type PipelineStage = 'lead' | 'quoted' | 'confirmed' | 'in_progress' | 'delivered' | 'paid'
+export type PipelineStage = 'quoted' | 'confirmed' | 'in_progress' | 'delivered' | 'paid'
 
 export interface Project {
   id: string
@@ -131,7 +131,7 @@ export interface QuoteItem {
   sort_order: number
 }
 
-export type PaymentMethod = 'wire_transfer' | 'cash' | 'bit'
+export type PaymentMethod = 'wire_transfer' | 'cash'
 
 export interface Payment {
   id: string

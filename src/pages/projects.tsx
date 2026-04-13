@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Plus, Search, Filter, CalendarDays, ChevronRight,
+  Plus, Search, Filter, CalendarDays, ChevronRight, ChevronDown,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { PipelineBadge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { fmtCurrency, fmtDate, cn, PIPELINE_STAGES } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
-import type { Project, PipelineStage, Quote, Payment } from '@/types/database'
+import type { Project, PipelineStage } from '@/types/database'
 
 interface ProjectWithFinance extends Project {
   total: number
@@ -18,73 +18,111 @@ interface ProjectWithFinance extends Project {
   clientName: string
 }
 
-const STAGE_ORDER: PipelineStage[] = ['lead', 'quoted', 'confirmed', 'in_progress', 'delivered', 'paid']
+const STAGES = Object.keys(PIPELINE_STAGES) as PipelineStage[]
 
 export function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectWithFinance[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [stageFilter, setStageFilter] = useState<PipelineStage | 'all'>('all')
+  const [filter, setFilter] = useState<PipelineStage | 'all'>('all')
 
-  useEffect(() => {
-    async function load() {
-      const { data: rawProjects } = await supabase
-        .from('projects')
-        .select('*, client:clients(name), quotes(total), payments(amount)')
-        .order('created_at', { ascending: false })
+  const load = async () => {
+    const { data } = await supabase
+      .from('projects')
+      .select('*, client:clients(name), quotes(total), payments(amount)')
+      .order('created_at', { ascending: false })
 
-      const enriched: ProjectWithFinance[] = (rawProjects ?? []).map(p => {
-        const quotes = (p.quotes as Pick<Quote, 'total'>[] | null) ?? []
-        const payments = (p.payments as Pick<Payment, 'amount'>[] | null) ?? []
-        const total = quotes.length > 0 ? quotes[quotes.length - 1]!.total : 0
-        const paid = payments.reduce((s, pay) => s + pay.amount, 0)
-        return {
-          ...p,
-          total,
-          paid,
-          remaining: Math.max(0, total - paid),
-          clientName: (p.client as { name: string } | null)?.name ?? '-',
-          quotes: undefined,
-          payments: undefined,
-        } as ProjectWithFinance
-      })
+    const mapped = (data ?? []).map((p: Record<string, unknown>) => {
+      const quotes = (p.quotes ?? []) as { total: number }[]
+      const payments = (p.payments ?? []) as { amount: number }[]
+      const total = quotes.reduce((s, q) => Math.max(s, q.total), 0)
+      const paid = payments.reduce((s, pay) => s + pay.amount, 0)
+      return {
+        ...p,
+        total,
+        paid,
+        remaining: Math.max(0, total - paid),
+        clientName: (p.client as { name: string } | null)?.name ?? '-',
+        quotes: undefined,
+        payments: undefined,
+      } as unknown as ProjectWithFinance
+    })
 
-      setProjects(enriched)
-      setLoading(false)
+    setProjects(mapped)
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const updateStage = async (projectId: string, stage: PipelineStage) => {
+    await supabase.from('projects').update({ pipeline_stage: stage }).eq('id', projectId)
+
+    // Auto-create tasks when moving to confirmed
+    if (stage === 'confirmed') {
+      const proj = projects.find(p => p.id === projectId)
+      if (proj) {
+        // Get quote items for this project
+        const { data: quotes } = await supabase
+          .from('quotes')
+          .select('id')
+          .eq('project_id', projectId)
+          .limit(1)
+
+        if (quotes && quotes.length > 0) {
+          const { data: items } = await supabase
+            .from('quote_items')
+            .select('name, description')
+            .eq('quote_id', (quotes[0] as { id: string }).id)
+
+          if (items && items.length > 0) {
+            // Check if tasks already exist for this project
+            const { data: existingTasks } = await supabase
+              .from('tasks')
+              .select('id')
+              .eq('project_id', projectId)
+              .limit(1)
+
+            if (!existingTasks || existingTasks.length === 0) {
+              const tasks = (items as { name: string; description: string | null }[]).map(item => ({
+                project_id: projectId,
+                title: item.description ? `${item.name} (${item.description})` : item.name,
+                completed: false,
+                due_date: proj.delivery_date || null,
+                priority: 'medium',
+              }))
+              await supabase.from('tasks').insert(tasks)
+            }
+          }
+        }
+      }
     }
-    load()
-  }, [])
+
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, pipeline_stage: stage } : p))
+  }
 
   const filtered = useMemo(() => {
     let result = projects
-    if (stageFilter !== 'all') {
-      result = result.filter(p => p.pipeline_stage === stageFilter)
-    }
+    if (filter !== 'all') result = result.filter(p => p.pipeline_stage === filter)
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter(p =>
-        p.name.toLowerCase().includes(q) ||
-        p.clientName.toLowerCase().includes(q)
+        p.name.toLowerCase().includes(q) || p.clientName.toLowerCase().includes(q)
       )
     }
     return result
-  }, [projects, stageFilter, search])
+  }, [projects, filter, search])
 
-  const groupedByStage = useMemo(() => {
-    if (stageFilter !== 'all') return null
-    const groups: Record<PipelineStage, ProjectWithFinance[]> = {
-      lead: [], quoted: [], confirmed: [], in_progress: [], delivered: [], paid: [],
+  const grouped = useMemo(() => {
+    const groups: Record<string, ProjectWithFinance[]> = {}
+    for (const stage of STAGES) {
+      const items = filtered.filter(p => p.pipeline_stage === stage)
+      if (items.length > 0) groups[stage] = items
     }
-    filtered.forEach(p => groups[p.pipeline_stage].push(p))
     return groups
-  }, [filtered, stageFilter])
+  }, [filtered])
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gold-dark border-t-transparent" />
-      </div>
-    )
+    return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-gold-dark border-t-transparent" /></div>
   }
 
   return (
@@ -99,8 +137,8 @@ export function ProjectsPage() {
         }
       />
 
-      {/* Search + Filters */}
-      <div className="mb-6 flex gap-3">
+      {/* Search + filter */}
+      <div className="mb-6 flex items-center gap-4">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
           <input
@@ -111,69 +149,42 @@ export function ProjectsPage() {
           />
         </div>
         <div className="flex rounded-xl border border-sand overflow-hidden">
-          <button
-            onClick={() => setStageFilter('all')}
-            className={cn(
-              'px-3 py-2 text-xs font-medium transition-colors',
-              stageFilter === 'all' ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream',
-            )}
-          >
-            All
-          </button>
-          {STAGE_ORDER.map(stage => (
+          {(['all', ...STAGES] as const).map(s => (
             <button
-              key={stage}
-              onClick={() => setStageFilter(stage)}
+              key={s}
+              onClick={() => setFilter(s)}
               className={cn(
                 'px-3 py-2 text-xs font-medium transition-colors',
-                stageFilter === stage ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream',
+                filter === s ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream',
               )}
             >
-              {PIPELINE_STAGES[stage].label}
+              {s === 'all' ? 'All' : PIPELINE_STAGES[s].label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Project list */}
-      {filtered.length === 0 ? (
+      {Object.keys(grouped).length === 0 ? (
         <EmptyState
           icon={Filter}
-          title="No projects found"
-          description={search ? 'Try a different search term' : 'Create your first quote to get started'}
-          action={!search ? { label: 'New Quote', onClick: () => {} } : undefined}
+          title="No projects"
+          description={filter !== 'all' ? 'No projects in this stage' : 'Create a quote to start a project'}
+          action={{ label: 'New Quote', onClick: () => window.location.href = '/quotes' }}
         />
-      ) : groupedByStage ? (
-        // Grouped by stage
-        <div className="space-y-8">
-          {STAGE_ORDER.map(stage => {
-            const stageProjects = groupedByStage[stage]
-            if (stageProjects.length === 0) return null
-
-            return (
-              <div key={stage}>
-                <div className="mb-3 flex items-center gap-2">
-                  <span className={cn('h-2 w-2 rounded-full', PIPELINE_STAGES[stage].dot)} />
-                  <h3 className="text-sm font-semibold text-bark">
-                    {PIPELINE_STAGES[stage].label}
-                  </h3>
-                  <span className="text-xs text-muted">({stageProjects.length})</span>
-                </div>
-
-                <div className="space-y-2">
-                  {stageProjects.map(p => (
-                    <ProjectRow key={p.id} project={p} />
-                  ))}
-                </div>
-              </div>
-            )
-          })}
-        </div>
       ) : (
-        // Flat list (filtered by stage)
-        <div className="space-y-2">
-          {filtered.map(p => (
-            <ProjectRow key={p.id} project={p} />
+        <div className="space-y-6">
+          {Object.entries(grouped).map(([stage, items]) => (
+            <div key={stage}>
+              <div className="mb-3 flex items-center gap-2">
+                <PipelineBadge stage={stage as PipelineStage} />
+                <span className="text-xs text-muted">({items.length})</span>
+              </div>
+              <div className="space-y-2">
+                {items.map(p => (
+                  <ProjectCard key={p.id} project={p} onStageChange={updateStage} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -181,20 +192,18 @@ export function ProjectsPage() {
   )
 }
 
-function ProjectRow({ project: p }: { project: ProjectWithFinance }) {
+function ProjectCard({ project: p, onStageChange }: { project: ProjectWithFinance; onStageChange: (id: string, stage: PipelineStage) => void }) {
+  const [showStageMenu, setShowStageMenu] = useState(false)
   const progressPct = p.total > 0 ? Math.min(100, (p.paid / p.total) * 100) : 0
 
   return (
-    <Link
-      to={`/projects/${p.id}`}
-      className="flex items-center justify-between rounded-2xl border border-sand/40 bg-white px-5 py-4 hover:border-gold/40 hover:shadow-sm transition-all"
-    >
-      <div className="flex items-center gap-5">
-        <div>
-          <p className="text-sm font-semibold text-bark">{p.name}</p>
+    <div className="flex items-center justify-between rounded-2xl border border-sand/40 bg-white px-5 py-4 hover:border-gold/40 hover:shadow-sm transition-all">
+      <Link to={`/projects/${p.id}`} className="flex items-center gap-5 flex-1 min-w-0">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-bark truncate">{p.name}</p>
           <p className="text-xs text-muted">{p.clientName}</p>
         </div>
-      </div>
+      </Link>
 
       <div className="flex items-center gap-6">
         {p.delivery_date && (
@@ -204,23 +213,47 @@ function ProjectRow({ project: p }: { project: ProjectWithFinance }) {
           </span>
         )}
 
-        {/* Payment progress */}
         <div className="w-28">
           <div className="mb-1 flex justify-between text-[10px]">
             <span className="text-muted">{fmtCurrency(p.paid)}</span>
             <span className="font-semibold text-bark">{fmtCurrency(p.total)}</span>
           </div>
           <div className="h-1.5 rounded-full bg-cream-dark">
-            <div
-              className="h-full rounded-full bg-forest transition-all duration-500"
-              style={{ width: `${progressPct}%` }}
-            />
+            <div className="h-full rounded-full bg-forest transition-all duration-500" style={{ width: `${progressPct}%` }} />
           </div>
         </div>
 
-        <PipelineBadge stage={p.pipeline_stage} />
-        <ChevronRight size={16} className="text-sand" />
+        {/* Inline stage changer */}
+        <div className="relative">
+          <button onClick={() => setShowStageMenu(!showStageMenu)} className="flex items-center gap-1">
+            <PipelineBadge stage={p.pipeline_stage} />
+            <ChevronDown size={12} className="text-muted" />
+          </button>
+          {showStageMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowStageMenu(false)} />
+              <div className="absolute right-0 top-8 z-20 rounded-xl border border-sand bg-white p-1 shadow-lg min-w-[140px]">
+                {STAGES.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => { onStageChange(p.id, s); setShowStageMenu(false) }}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors',
+                      p.pipeline_stage === s ? 'bg-cream font-semibold text-bark' : 'text-muted hover:bg-cream hover:text-bark',
+                    )}
+                  >
+                    <PipelineBadge stage={s} />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        <Link to={`/projects/${p.id}`}>
+          <ChevronRight size={16} className="text-sand" />
+        </Link>
       </div>
-    </Link>
+    </div>
   )
 }

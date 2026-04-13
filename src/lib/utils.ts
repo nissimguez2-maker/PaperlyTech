@@ -56,7 +56,6 @@ export const PAYMENT_METHODS = {
 
 /** Pipeline stage display config */
 export const PIPELINE_STAGES = {
-  lead: { label: 'Lead', color: 'bg-sand', dot: 'bg-muted' },
   quoted: { label: 'Quoted', color: 'bg-navy-bg', dot: 'bg-navy-dot' },
   confirmed: { label: 'Confirmed', color: 'bg-navy-bg', dot: 'bg-navy' },
   in_progress: { label: 'In Progress', color: 'bg-navy-bg', dot: 'bg-navy-dot' },

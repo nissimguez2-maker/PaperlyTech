@@ -2,7 +2,6 @@ import { cn } from '@/lib/utils'
 import type { PipelineStage } from '@/types/database'
 
 const stageStyles: Record<PipelineStage, { bg: string; text: string; dot: string }> = {
-  lead: { bg: 'bg-cream-dark', text: 'text-muted', dot: 'bg-sand' },
   quoted: { bg: 'bg-navy-bg', text: 'text-navy', dot: 'bg-navy-dot' },
   confirmed: { bg: 'bg-navy-bg', text: 'text-navy', dot: 'bg-navy' },
   in_progress: { bg: 'bg-navy-bg', text: 'text-navy', dot: 'bg-navy-dot' },
@@ -11,7 +10,6 @@ const stageStyles: Record<PipelineStage, { bg: string; text: string; dot: string
 }
 
 const stageLabels: Record<PipelineStage, string> = {
-  lead: 'Lead',
   quoted: 'Quoted',
   confirmed: 'Confirmed',
   in_progress: 'In Progress',

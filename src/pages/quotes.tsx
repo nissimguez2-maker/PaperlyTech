@@ -206,7 +206,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         quote_id: quoteId,
         article_id: it.articleId || null,
         name: it.name || articleOptions.find(o => o.value === it.articleId)?.label || 'Item',
-        description: null,
+        description: articleOptions.find(o => o.value === it.articleId)?.label || null,
         quantity: it.qty,
         unit_price: safeFloat(it.unitPrice),
         is_override: it.isOverride,
