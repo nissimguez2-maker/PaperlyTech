@@ -12,7 +12,7 @@ import { CatalogPage } from '@/pages/catalog'
 import { SuppliersPage } from '@/pages/suppliers'
 import { SettingsPage } from '@/pages/settings'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import type { Category, Article } from '@/types/database'
 
 function ProtectedRoutes() {
@@ -69,6 +69,7 @@ function ProtectedRoutes() {
 }
 
 export default function App() {
+  if (!isSupabaseConfigured) return <ConfigurationRequired />
   const { user, loading } = useAuth()
   if (loading) {
     return (
@@ -79,4 +80,26 @@ export default function App() {
   }
   if (!user) return <LoginPage />
   return <ProtectedRoutes />
+}
+
+function ConfigurationRequired() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-cream p-6">
+      <div className="max-w-lg rounded-lg border border-gold-dark/30 bg-white p-8 shadow-sm">
+        <h1 className="mb-3 text-2xl font-semibold text-ink">Paperly is not configured</h1>
+        <p className="mb-4 text-sm text-muted">
+          The Supabase credentials are missing, so the app cannot load. The deployment is missing
+          two environment variables.
+        </p>
+        <ul className="mb-4 list-disc pl-5 text-sm text-ink">
+          <li><code>VITE_SUPABASE_URL</code></li>
+          <li><code>VITE_SUPABASE_ANON_KEY</code></li>
+        </ul>
+        <p className="text-sm text-muted">
+          Add them in Netlify under <strong>Site settings → Environment variables</strong>, then
+          trigger a new deploy.
+        </p>
+      </div>
+    </div>
+  )
 }
