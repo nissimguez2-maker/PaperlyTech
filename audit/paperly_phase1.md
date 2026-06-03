@@ -25,7 +25,7 @@ L'outil est **techniquement sain dans ses fondations** (UUID, montants en `numer
 
 S'y ajoute un **risque de fiabilité** : une simple ligne en base dans un état de pipeline « inconnu » (le schéma en autorise 6, l'app n'en connaît que 3, défaut `'lead'`) fait **planter** le badge sans filet (aucune Error Boundary) → écran blanc pour une utilisatrice non-technique. Et des **suppressions destructrices** (cascade sur paiements encaissés, suppression d'item sans confirmation) menacent la preuve comptable.
 
-**Trois priorités structurantes pour la Phase 2 :** (1) réparer + repenser le **devis/PDF** (polices, cohérence des totaux, « vision avant prix », FR/₪) ; (2) **stabiliser le prix** (acceptation, verrou, versions, remise) ; (3) **rendre l'outil franco-israélien, responsive et conscient du canal planner** (commission, échéances, fiche client, saisonnalité).
+**Trois priorités structurantes pour la Phase 2 :** (1) réparer + repenser le **devis/PDF** (polices, cohérence des totaux, « vision avant prix », FR/₪) ; (2) **stabiliser le prix** (acceptation, verrou, versions, remise) ; (3) **rendre l'outil franco-israélien, responsive et conscient du canal planner** (échéances, visibilité, fiche client, saisonnalité).
 
 ---
 
