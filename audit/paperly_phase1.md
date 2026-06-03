@@ -21,7 +21,7 @@ L'outil est **techniquement sain dans ses fondations** (UUID, montants en `numer
 
 1. **L'artefact qui « vend la vision » est cassé.** Les polices Inter du devis PDF sont en réalité des pages HTML encodées (pas des TTF) → le PDF retombe en Helvetica (corroboré ×3). Pire, **le total du PDF ne correspond pas au total à l'écran** (arrondi entier vs 2 décimales), et le devis se lit comme **une facture/liste de prix**, pas comme une proposition de direction artistique.
 2. **Le prix n'est pas stable.** Aucun verrou d'acceptation ni vrai versionnement (le champ `version` est figé à 1), et toute édition ultérieure **efface silencieusement la remise** (`subtotal = total`) → le prix qu'Eden a accepté « remonte » tout seul (corroboré ×3). C'est exactement la rupture de confiance redoutée par Eden et Claire.
-3. **L'outil ne parle pas à ses personas.** L'UI est **100 % en anglais** pour une clientèle francophone ; **Claire (planner) est littéralement absente du modèle** (aucune commission, `event_date` jamais affiché) alors que c'est le canal d'acquisition n°1 ; et **rien n'est responsive** alors que Sacha travaille au téléphone.
+3. **L'outil ne parle pas à ses personas.** L'UI est **100 % en anglais** pour une clientèle francophone ; **Claire (planner) n'a aucune visibilité** dans l'outil (`event_date` jamais affiché, aucune vue d'échéances) alors que c'est le canal d'acquisition n°1 ; et **rien n'est responsive** alors que Sacha travaille au téléphone.
 
 S'y ajoute un **risque de fiabilité** : une simple ligne en base dans un état de pipeline « inconnu » (le schéma en autorise 6, l'app n'en connaît que 3, défaut `'lead'`) fait **planter** le badge sans filet (aucune Error Boundary) → écran blanc pour une utilisatrice non-technique. Et des **suppressions destructrices** (cascade sur paiements encaissés, suppression d'item sans confirmation) menacent la preuve comptable.
 
@@ -48,7 +48,7 @@ S'y ajoute un **risque de fiabilité** : une simple ligne en base dans un état 
 |---|---------|--------------------------|------------|------------------------------|
 | E1 | **Le devis se lit comme une liste de prix, pas comme une vision.** Écran et PDF = tableau `Description/Qté/Prix/Total`, libellé « QUOTE », aucune intention créative ni notion de « système visuel ». *(Corroboré ×2)* | `src/lib/pdf-quote.ts:120-124,186-253,292-318` ; `src/pages/quotes.tsx:338-441` | Sarah, Eden | Bloc **« Direction créative / La vision »** (1 paragraphe Cormorant) **avant** le tableau ; renommer « QUOTE » → **« Proposition »** ; regrouper par **système** (papeterie / signalétique / scénographie) ; total présent mais discret. |
 | E2 | **UI 100 % anglaise + PDF FR/EN incohérent** (« Offert » isolé dans un document anglais) pour une communauté francophone. *(Corroboré ×4)* | `src/components/layout/sidebar.tsx:10-21` ; `src/lib/utils.ts:57-61` ; `src/lib/pdf-quote.ts:124,233,330` | Tous | Passer l'UI en **français** (couche i18n, FR par défaut, **HE optionnel**) ; PDF **entièrement FR**. |
-| E3 | **Claire/planner absente du modèle.** Aucun champ `commission`/apporteur nulle part ; `event_date` existe en base mais **jamais affiché** ; aucune visibilité d'échéances type planner. *(Corroboré ×2)* | grep `commission` = 0 ; `src/types/database.ts:88-140,93` ; `src/pages/dashboard.tsx:95-101` | Claire | Tables **`referrers` + `project_referrals`** (taux %, base, statut de versement) ; commission visible au devis/trésorerie ; **exposer `event_date` vs `delivery_date`** + relances/échéances. |
+| E3 | **Aucune visibilité « planner » pour Claire.** `event_date` existe en base mais **jamais affiché** (seul `delivery_date` l'est) ; aucune vue d'échéances/jalons ni « à risque » ; le changement de stage se fait à l'aveugle. | `src/types/database.ts:93` ; `src/pages/dashboard.tsx:95-101` ; `src/pages/projects.tsx:394-428` | Claire | **Exposer `event_date` vs `delivery_date`**, ajouter **relances/échéances** et une vue « à risque ». La fiabilité perçue (délais tenus, visibilité) est le produit pour un planner. |
 | E4 | **Remises non bornées.** En mode `fixed`, une remise > sous-total → **devis à 0 ₪** exporté sans alerte (le garde-fou « max 100 % » n'existe qu'en `%`) ; une remise **négative** = majoration **invisible** (total > sous-total sans ligne). | `src/pages/quotes.tsx:104-108,494-496,506` ; `src/lib/pdf-quote.ts:275` | Eden, Sacha | Borner la remise à **`[0, sous-total]`** et **avertir** quand elle approche/atteint le sous-total. |
 | E5 | **KPIs non réconciliés.** « In My Pocket » somme **tous** les paiements, alors que « Quoted »/« In the Works » comptent par stage → un acompte sur projet `quoted` est **compté deux fois** ; aucune vue « restant dû » global. | `src/pages/finance.tsx:46-50,59-60` | Sacha, Claire | Distinguer clairement **CA signé / encaissé / restant dû** ; éviter le double-comptage acompte+devis. |
 | E6 | **Devis « tout-ou-rien ».** Un seul bouton « Export PDF » fait tout d'un coup (upsert client → projet → devis → items → PDF → vide le formulaire), sans brouillon ni rollback → **projets fantômes** en cas d'échec partiel. | `src/pages/quotes.tsx:153-273,267,521-524` | Eden, Sacha | Dissocier **« Enregistrer »** et **« Exporter »** ; récap/confirmation ; transaction ou suppression du projet créé en cas d'erreur. |
@@ -109,7 +109,7 @@ Elle paie **une vision, pas du papier**, et change souvent d'avis. L'outil doit 
 Elle veut **un prix stable, un rendu impeccable, de la vitesse**. Aujourd'hui : **total PDF ≠ écran** (C2), **prix qui bouge** (C3, E4), **flux export tout-ou-rien** (E6), **races à la navigation** (M6), **look générique** (E8).
 
 ### 📋 Claire — la wedding planner (canal n°1)
-Elle veut **fiabilité, stabilité prix/délai, visibilité, commission**. Aujourd'hui : **absente du modèle** (E3) — aucune commission, `event_date` jamais montré, aucune vue d'échéances —, **prix instable** (C3), **KPIs faux** (E5), crédibilité minée par l'**UI anglaise** et les **contrastes faibles** (E2, F4).
+Elle veut **fiabilité, stabilité prix/délai, visibilité, autonomie**. Aujourd'hui : **aucune visibilité d'échéances** (E3) — `event_date` jamais montré, pas de vue jalons/à-risque —, **prix instable** (C3), **KPIs faux** (E5), crédibilité minée par l'**UI anglaise** et les **contrastes faibles** (E2, F4).
 
 ---
 
@@ -128,9 +128,9 @@ Elle veut **fiabilité, stabilité prix/délai, visibilité, commission**. Aujou
 ### 🏗️ Chantiers structurants — effort moyen/fort, fort impact
 - **Réparer + repenser le devis/PDF** en « proposition de vision » (C1, E1, F3) — l'objet de marque central.
 - **Stabiliser le prix** : acceptation + verrou + versionnement + remise relue (C3).
-- **Localisation FR (+ ₪, + HE/RTL optionnel)** de l'UI et du PDF (E2, M1).
+- **Localisation FR (+ ₪)** de l'UI et du PDF — hébreu/RTL différé (E2, M1).
 - **Responsive** complet (C6).
-- **Modèle planner + commission + échéances/`event_date`** (E3).
+- **Visibilité planner** : `event_date` + échéances/relances + vue « à risque » (E3).
 - **Fiche/historique client** (E9) ; **réconciliation KPIs + saisonnalité** (E5, M15).
 - **Discipline design-system** + voix serif (E8, M9) ; **sécurisation données** (types générés, FK, CHECK — M4, M5).
 
@@ -139,12 +139,11 @@ Elle veut **fiabilité, stabilité prix/délai, visibilité, commission**. Aujou
 ## 7. Questions ouvertes / hypothèses à valider
 
 1. **Audit statique uniquement** : confirmer par un build le **rendu PDF réel** (polices) et la **taille du bundle** (les 3,5 Mo de `pdf-fonts.ts` importés statiquement — `src/lib/pdf-quote.ts:2`).
-2. **Cycle de vie projet** : garder **3 stages** ou réintroduire `confirmed`/`paid` (états « accepté » et « payé » distincts de « delivered ») ?
-3. **Données existantes** : y a-t-il déjà en base des projets en `lead`/`confirmed`/`paid` (impact migration C4) ?
-4. **Multi-utilisateur** : Sacha seule, ou + Nessim/assistant ? (table `profiles` fantôme, RLS — M4, M14).
-5. **Hébreu/RTL** : quelle part de clients/planners hébréophones ? Priorité du chantier HE.
-6. **Commission planner** : % par défaut, base de calcul (devis vs encaissé), suivi du versement (E3).
-7. **Bit** : à réintégrer comme moyen de paiement (M7) ?
+2. **Données existantes** : y a-t-il déjà en base des projets dans un stage hérité (`lead`/`confirmed`/`paid`) ? (impact migration C4).
+3. **Multi-utilisateur** : Sacha seule, ou + Nessim/assistant ? (table `profiles` fantôme, RLS — M4, M14).
+4. **Bit** : à réintégrer comme moyen de paiement (M7) ?
+
+> **Décisions validées (post-Phase 1) :** cycle de vie projet à **5 états** — Quoted → Accepted → In Progress → Delivered → Paid ; **français d'abord** (UI + PDF + ₪), hébreu/RTL différé ; **Phase 3 = plan uniquement** (aucun code écrit).
 
 ---
 
