@@ -10,7 +10,7 @@ import { Modal } from '@/components/ui/modal'
 import { useToast } from '@/components/ui/toast'
 import { uid, fmtCurrency, safeFloat, cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
-import { generateQuotePdf } from '@/lib/pdf-quote'
+// generateQuotePdf est importé dynamiquement à l'export (code-splitting des polices PDF)
 import type { Category, Article } from '@/types/database'
 
 interface QuoteItemLocal {
@@ -242,7 +242,8 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
       const { error: itemsErr } = await supabase.from('quote_items').insert(quoteItems)
       if (itemsErr) throw new Error('Failed to create quote items')
 
-      // 7. Generate & download PDF
+      // 7. Generate & download PDF (import dynamique : les polices ne chargent qu'ici)
+      const { generateQuotePdf } = await import('@/lib/pdf-quote')
       generateQuotePdf({
         clientName: client.trim(),
         deliveryDate: deliveryDate || null,

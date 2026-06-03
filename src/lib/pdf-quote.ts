@@ -39,9 +39,11 @@ function generateQuoteRef(): string {
   return 'Q-' + ref
 }
 
-function fmtNIS(n: number): string {
-  // 2 décimales, format français — cohérent au centime avec l'écran (fmtCurrency)
-  return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function fmtMoney(n: number): string {
+  // "1 234,50 ₪" — 2 décimales, séparateur espace normale (rendu fiable dans le PDF),
+  // cohérent au centime avec l'écran (fmtCurrency). ₪ = U+20AA, présent dans Inter.
+  const s = n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return s + ' ₪'
 }
 
 function registerFonts(doc: jsPDF) {
@@ -243,11 +245,11 @@ export function generateQuotePdf(data: PdfQuoteData) {
       doc.setTextColor(...NEAR_BLACK)
       doc.text(item.hideQty ? '—' : String(item.quantity), col.qty, mid, { align: 'right' })
 
-      doc.text('NIS ' + fmtNIS(item.unitPrice), col.price, mid, { align: 'right' })
+      doc.text(fmtMoney(item.unitPrice), col.price, mid, { align: 'right' })
 
       const lt = item.quantity * item.unitPrice
       doc.setFont('Inter', 'bold')
-      doc.text('NIS ' + fmtNIS(lt), col.total, mid, { align: 'right' })
+      doc.text(fmtMoney(lt), col.total, mid, { align: 'right' })
     }
 
     y += rowH
@@ -270,7 +272,7 @@ export function generateQuotePdf(data: PdfQuoteData) {
   doc.text('Subtotal', totL, y)
   doc.setFontSize(10)
   doc.setTextColor(...NEAR_BLACK)
-  doc.text('NIS ' + fmtNIS(data.subtotal), rightEdge, y, { align: 'right' })
+  doc.text(fmtMoney(data.subtotal), rightEdge, y, { align: 'right' })
 
   // Discount
   if (data.discountAmount > 0) {
@@ -281,7 +283,7 @@ export function generateQuotePdf(data: PdfQuoteData) {
     doc.text(data.discountLabel || 'Discount', totL, y)
     doc.setFontSize(10)
     doc.setTextColor(...DISC_RED)
-    doc.text('-NIS ' + fmtNIS(data.discountAmount), rightEdge, y, { align: 'right' })
+    doc.text('− ' + fmtMoney(data.discountAmount), rightEdge, y, { align: 'right' })
   }
 
   // Hairline
@@ -302,21 +304,11 @@ export function generateQuotePdf(data: PdfQuoteData) {
   doc.setTextColor(...PAGE_BG)
   doc.text('TOTAL', totL + 8, y + 9)
 
-  // Total amount
-  const totalStr = fmtNIS(data.total)
+  // Total amount (₪ inclus, une seule chaîne)
   doc.setFont('Inter', 'bold')
   doc.setFontSize(18)
-  const numW = doc.getTextWidth(totalStr)
-  const numX = rightEdge - 6
-
   doc.setTextColor(...PAGE_BG)
-  doc.text(totalStr, numX, y + 10, { align: 'right' })
-
-  // NIS prefix in gold
-  doc.setFont('Inter', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(...GOLD)
-  doc.text('NIS', numX - numW - 3, y + 9)
+  doc.text(fmtMoney(data.total), rightEdge - 6, y + 10, { align: 'right' })
 
   // ══════════════ FOOTER ══════════════
   const fY = 274
