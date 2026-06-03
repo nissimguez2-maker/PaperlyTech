@@ -71,15 +71,7 @@ export function ProjectsPage() {
   useEffect(() => { loadProjects() }, [loadProjects])
 
   const changeStage = useCallback(async (projectId: string, newStage: PipelineStage) => {
-    // Delivery gate: block moving to Delivered if balance > 0
-    if (newStage === 'delivered') {
-      const proj = projects.find(p => p.id === projectId)
-      if (proj && proj.remaining > 0) {
-        toast('Cannot mark as Delivered — ' + fmtCurrency(proj.remaining) + ' still owed', 'error')
-        return
-      }
-    }
-
+    // Livraison indépendante du paiement : plus de blocage si solde dû (décision Phase 3)
     const previousStage = projects.find(p => p.id === projectId)?.pipeline_stage
     setProjects(prev => prev.map(p =>
       p.id === projectId ? { ...p, pipeline_stage: newStage } : p

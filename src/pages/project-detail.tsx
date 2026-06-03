@@ -163,12 +163,7 @@ export function ProjectDetailPage() {
   const changeStage = useCallback(async (stage: PipelineStage) => {
     if (!project) return
 
-    // Delivery gate: block if balance > 0
-    if (stage === 'delivered' && remaining > 0) {
-      toast('Cannot mark as Delivered — ' + fmtCurrency(remaining) + ' still owed', 'error')
-      return
-    }
-
+    // Livraison indépendante du paiement : plus de blocage si solde dû (décision Phase 3)
     setProject({ ...project, pipeline_stage: stage })
     await supabase.from('projects').update({ pipeline_stage: stage }).eq('id', project.id)
 
