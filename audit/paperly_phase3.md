@@ -14,7 +14,7 @@
 4. **`revenue_type` (`print` / `digital` / `original`) au niveau LIGNE** (`quote_items`) — **une commande peut mélanger les 3 catégories**. Le reporting « CA par activité » agrège au niveau ligne. **Bundles différés.**
 5. **Migration sûre** des éventuelles lignes de pipeline héritées.
 6. **IA dans l'ordre** : ICS → email/rappels → pré-remplissage ; opérée par Nessim (Edge Functions Supabase / n8n).
-7. Rappels transverses : **français + ₪**, **hébreu/RTL différé**, **aucune segmentation par type de client**, **aucune** notion de commission/apporteur.
+7. Rappels transverses : **français + ₪**, **hébreu/RTL différé**, **aucune segmentation par type de client**.
 
 ---
 
@@ -250,7 +250,7 @@ group by qi.revenue_type;
 
 **DoD :** critères d'acceptation du chantier verts · recette QA de la section concernée passée · testé par Sacha sur 1–2 vrais devis (mobile) · migration appliquée sur branche puis prod avec sauvegarde · aucune régression desktop.
 
-**Hors-périmètre / différé (assumé) :** hébreu / RTL ; options A/B parallèles ; bundles/packs ; rôles multi-utilisateur ; toute notion de commission/apporteur ; tout portail client à compte.
+**Hors-périmètre / différé (assumé) :** hébreu / RTL ; options A/B parallèles ; bundles/packs ; rôles multi-utilisateur ; tout portail client à compte.
 
 ---
 
