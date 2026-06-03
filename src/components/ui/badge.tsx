@@ -1,25 +1,30 @@
 import { cn } from '@/lib/utils'
 import type { PipelineStage } from '@/types/database'
 
-const stageStyles: Record<PipelineStage, { bg: string; text: string; dot: string }> = {
+const stageStyles: Record<string, { bg: string; text: string; dot: string }> = {
   quoted: { bg: 'bg-navy-bg', text: 'text-navy', dot: 'bg-navy-dot' },
   in_progress: { bg: 'bg-navy-bg', text: 'text-navy', dot: 'bg-navy' },
   delivered: { bg: 'bg-forest-bg', text: 'text-forest', dot: 'bg-forest' },
 }
 
-const stageLabels: Record<PipelineStage, string> = {
-  quoted: 'Quoted',
-  in_progress: 'In Progress',
-  delivered: 'Delivered',
+const stageLabels: Record<string, string> = {
+  quoted: 'Devisé',
+  in_progress: 'En production',
+  delivered: 'Livré',
 }
 
+// Repli neutre : tout stage inconnu (donnée héritée, valeur future) reste affichable
+// au lieu de faire planter le rendu (cf. audit C4).
+const FALLBACK = { bg: 'bg-sand/40', text: 'text-muted', dot: 'bg-muted' }
+
 interface BadgeProps {
-  stage: PipelineStage
+  stage: PipelineStage | string
   className?: string
 }
 
 export function PipelineBadge({ stage, className }: BadgeProps) {
-  const s = stageStyles[stage]
+  const s = stageStyles[stage] ?? FALLBACK
+  const label = stageLabels[stage] ?? stage
 
   return (
     <span
@@ -30,7 +35,7 @@ export function PipelineBadge({ stage, className }: BadgeProps) {
       )}
     >
       <span className={cn('h-1.5 w-1.5 rounded-full', s.dot)} />
-      {stageLabels[stage]}
+      {label}
     </span>
   )
 }

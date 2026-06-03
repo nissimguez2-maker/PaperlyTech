@@ -40,7 +40,8 @@ function generateQuoteRef(): string {
 }
 
 function fmtNIS(n: number): string {
-  return n.toLocaleString('en-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+  // 2 décimales, format français — cohérent au centime avec l'écran (fmtCurrency)
+  return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function registerFonts(doc: jsPDF) {
@@ -106,7 +107,7 @@ export function generateQuotePdf(data: PdfQuoteData) {
   doc.setTextColor(...GOLD)
   doc.text(quoteRef, rightEdge, 22, { align: 'right' })
 
-  const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
   doc.setFont('Inter', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...WARM_GRAY)
@@ -164,7 +165,7 @@ export function generateQuotePdf(data: PdfQuoteData) {
   doc.setFontSize(12)
   doc.setTextColor(...NEAR_BLACK)
   if (data.deliveryDate) {
-    const dDate = new Date(data.deliveryDate + 'T00:00:00').toLocaleDateString('en-GB', {
+    const dDate = new Date(data.deliveryDate + 'T00:00:00').toLocaleDateString('fr-FR', {
       day: 'numeric', month: 'long', year: 'numeric',
     })
     doc.text(dDate, rightEdge - pad, cY + 16, { align: 'right' })

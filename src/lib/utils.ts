@@ -1,4 +1,5 @@
 import { format, parseISO } from 'date-fns'
+import { fr } from 'date-fns/locale'
 
 /** Generate unique ID */
 export function uid(): string {
@@ -9,7 +10,7 @@ export function uid(): string {
 export function fmtDate(iso: string | null): string {
   if (!iso) return '-'
   try {
-    return format(parseISO(iso), 'd MMMM yyyy')
+    return format(parseISO(iso), 'd MMMM yyyy', { locale: fr })
   } catch {
     return '-'
   }
@@ -19,15 +20,24 @@ export function fmtDate(iso: string | null): string {
 export function fmtMonth(iso: string | null): string {
   if (!iso) return 'Unknown'
   try {
-    return format(parseISO(iso + '-01'), 'MMMM yyyy')
+    return format(parseISO(iso + '-01'), 'MMMM yyyy', { locale: fr })
   } catch {
     return 'Unknown'
   }
 }
 
-/** Format currency in ILS */
+/** Formateur unique ₪ (ILS) — 2 décimales, format français. Source unique écran + PDF. */
+const ilsFormatter = new Intl.NumberFormat('fr-FR', {
+  style: 'currency',
+  currency: 'ILS',
+  currencyDisplay: 'narrowSymbol',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+/** Format currency in ILS → "1 234,50 ₪" */
 export function fmtCurrency(amount: number): string {
-  return `NIS ${amount.toLocaleString('en-IL', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+  return ilsFormatter.format(amount)
 }
 
 /** Safe parseFloat with fallback */
@@ -49,13 +59,14 @@ export function cn(...classes: (string | false | null | undefined)[]): string {
 
 /** Payment method display labels */
 export const PAYMENT_METHODS = {
-  wire_transfer: 'Wire Transfer',
-  cash: 'Cash',
+  wire_transfer: 'Virement',
+  cash: 'Espèces',
+  bit: 'Bit',
 } as const
 
 /** Pipeline stage display config */
 export const PIPELINE_STAGES = {
-  quoted: { label: 'Quoted', color: 'bg-navy-bg', dot: 'bg-navy-dot' },
-  in_progress: { label: 'In Progress', color: 'bg-navy-bg', dot: 'bg-navy' },
-  delivered: { label: 'Delivered', color: 'bg-forest-bg', dot: 'bg-forest' },
+  quoted: { label: 'Devisé', color: 'bg-navy-bg', dot: 'bg-navy-dot' },
+  in_progress: { label: 'En production', color: 'bg-navy-bg', dot: 'bg-navy' },
+  delivered: { label: 'Livré', color: 'bg-forest-bg', dot: 'bg-forest' },
 } as const

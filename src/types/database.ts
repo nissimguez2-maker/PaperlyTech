@@ -131,7 +131,7 @@ export interface QuoteItem {
   sort_order: number
 }
 
-export type PaymentMethod = 'wire_transfer' | 'cash'
+export type PaymentMethod = 'wire_transfer' | 'cash' | 'bit'
 
 export interface Payment {
   id: string

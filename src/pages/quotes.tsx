@@ -101,7 +101,9 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
     0),
   [items])
 
-  const clampedDiscVal = discMode === 'pct' ? Math.min(safeFloat(discVal), 100) : safeFloat(discVal)
+  // Remise bornée : jamais négative ; % plafonné à 100 ; fixe plafonné au sous-total (cf. audit E4)
+  const rawDiscVal = Math.max(0, safeFloat(discVal))
+  const clampedDiscVal = discMode === 'pct' ? Math.min(rawDiscVal, 100) : Math.min(rawDiscVal, subtotal)
   const discAmount = discMode === 'pct'
     ? subtotal * clampedDiscVal / 100
     : clampedDiscVal
@@ -184,8 +186,8 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
 
       // 2. Build project name
       const dateLabel = deliveryDate
-        ? new Date(deliveryDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-        : new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+        ? new Date(deliveryDate + 'T00:00:00').toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })
+        : new Date().toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })
       const projectName = client.trim() + ' - ' + dateLabel
 
       // 3. Create project
@@ -215,7 +217,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
           version: 1,
           subtotal,
           discount_mode: discMode,
-          discount_value: safeFloat(discVal),
+          discount_value: clampedDiscVal,
           total,
           notes: notes || null,
           exported_at: new Date().toISOString(),
@@ -477,7 +479,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                       discMode === 'fixed' ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream',
                     )}
                   >
-                    NIS
+                    ₪
                   </button>
                 </div>
                 <div className="relative flex-1">
@@ -487,12 +489,15 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                     onChange={e => setDiscVal(e.target.value)}
                     className={cn(
                       'w-full rounded-lg border bg-white px-3 py-1.5 text-sm focus:border-gold-dark focus:outline-none',
-                      discMode === 'pct' && safeFloat(discVal) > 100 ? 'border-coral' : 'border-sand',
+                      (discMode === 'pct' && safeFloat(discVal) > 100) || (discMode === 'fixed' && safeFloat(discVal) > subtotal) ? 'border-coral' : 'border-sand',
                     )}
                     placeholder="0"
                   />
                   {discMode === 'pct' && safeFloat(discVal) > 100 && (
-                    <p className="absolute -bottom-4 left-0 text-[10px] text-coral">Max 100%</p>
+                    <p className="absolute -bottom-4 left-0 text-[10px] text-coral">Max 100 %</p>
+                  )}
+                  {discMode === 'fixed' && safeFloat(discVal) > subtotal && (
+                    <p className="absolute -bottom-4 left-0 text-[10px] text-coral">Plafonné au sous-total</p>
                   )}
                 </div>
               </div>
