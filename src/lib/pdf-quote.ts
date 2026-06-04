@@ -63,13 +63,6 @@ function fmtDate(iso: string, lang: 'fr' | 'en'): string {
     lang === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-function generateQuoteRef(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let ref = ''
-  for (let i = 0; i < 6; i++) ref += chars[Math.floor(Math.random() * chars.length)]
-  return 'Q-' + ref
-}
-
 function registerFonts(doc: jsPDF) {
   doc.addFileToVFS('Inter-Regular.ttf', PDF_FONTS.InterRegular)
   doc.addFont('Inter-Regular.ttf', 'Inter', 'normal')
@@ -105,13 +98,10 @@ export function generateQuotePdf(data: PdfQuoteData, opts: GenerateQuoteOptions)
   const logoW = logoH * PDF_LOGO.ratio
   doc.addImage(PDF_LOGO.paperMark, 'PNG', mL, 13, logoW, logoH)
 
-  const quoteRef = data.quoteRef || generateQuoteRef()
-  doc.setFont('InterSB', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...INK)
-  doc.text(quoteRef, rightEdge, 19, { align: 'right' })
   const today = new Date().toLocaleDateString(
     lang === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-  doc.setFont('Inter', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...INK_SOFT)
-  doc.text(today, rightEdge, 25, { align: 'right' })
+  doc.setFont('Inter', 'normal'); doc.setFontSize(9); doc.setTextColor(...INK_SOFT)
+  doc.text(today, rightEdge, 21, { align: 'right' })
 
   rule(mL, 34, rightEdge)
 
