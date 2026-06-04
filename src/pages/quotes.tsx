@@ -45,6 +45,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
   const [discMode, setDiscMode] = useState<'pct' | 'fixed'>('pct')
   const [discVal, setDiscVal] = useState('')
   const [saving, setSaving] = useState(false)
+  const [pdfLang, setPdfLang] = useState<'fr' | 'en'>('fr')
 
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -235,8 +236,11 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
       if (projErr || !project) throw new Error('Échec de la création du projet')
 
       // 4. Build discount label
+      const discWord = pdfLang === 'fr' ? 'Remise' : 'Discount'
       const discLabel = discAmount > 0
-        ? (discMode === 'pct' ? 'Remise (' + clampedDiscVal + '%)' : 'Remise (' + clampedDiscVal + ' ₪)')
+        ? (discMode === 'pct'
+            ? discWord + ' (' + clampedDiscVal + (pdfLang === 'fr' ? ' %' : '%') + ')'
+            : discWord + ' (' + fmtCurrency(clampedDiscVal) + ')')
         : undefined
 
       // 5. Create quote
@@ -295,7 +299,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         discountAmount: discAmount,
         discountLabel: discLabel,
         total,
-      })
+      }, { lang: pdfLang })
 
       // 8. Refresh client list
       const { data: refreshedClients } = await supabase.from('clients').select('id, name').order('name')
@@ -558,10 +562,29 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
               </div>
             </div>
 
-            <div className="mt-6">
+            <div className="mt-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted">Langue du PDF</span>
+                <div className="flex overflow-hidden rounded-lg border border-sand" role="group" aria-label="Langue du PDF">
+                  {(['fr', 'en'] as const).map(l => (
+                    <button
+                      key={l}
+                      type="button"
+                      onClick={() => setPdfLang(l)}
+                      aria-pressed={pdfLang === l}
+                      className={cn(
+                        'px-3 py-1.5 text-xs font-semibold uppercase transition-colors',
+                        pdfLang === l ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream',
+                      )}
+                    >
+                      {l === 'fr' ? 'FR' : 'EN'}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <Button variant="primary" className="w-full" onClick={exportAndSave} disabled={saving}>
                 <Download size={16} />
-                {saving ? 'Enregistrement…' : 'Exporter le PDF'}
+                {saving ? 'Enregistrement…' : (pdfLang === 'fr' ? 'Exporter le PDF' : 'Export PDF')}
               </Button>
             </div>
           </Card>

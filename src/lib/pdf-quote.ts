@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf'
 import { PDF_FONTS } from './pdf-fonts'
+import { PDF_LOGO } from './pdf-logo'
 
 export interface PdfQuoteItem {
   name: string
@@ -22,15 +23,45 @@ export interface PdfQuoteData {
   quoteRef?: string
 }
 
-// Color palette
-const PAGE_BG: [number, number, number] = [250, 248, 244]
-const NEAR_BLACK: [number, number, number] = [44, 36, 22]
-const GOLD: [number, number, number] = [184, 149, 106]
-const WARM_GRAY: [number, number, number] = [154, 142, 126]
-const LIGHT_CREAM: [number, number, number] = [242, 237, 229]
-const DIVIDER: [number, number, number] = [212, 201, 184]
-const DISC_RED: [number, number, number] = [192, 57, 43]
-const MUTED_CIRCLE: [number, number, number] = [229, 221, 208]
+export interface GenerateQuoteOptions {
+  lang: 'fr' | 'en'
+}
+
+// ── Palette — pure black on warm-white, hairlines only. No accent colour. ──
+const PAPER:    [number, number, number] = [253, 252, 250] // warm-white ground (only fill)
+const INK:      [number, number, number] = [26, 24, 22]    // near-black — names, totals
+const INK_SOFT: [number, number, number] = [122, 118, 112] // labels, dates, footer
+const HAIRLINE: [number, number, number] = [222, 218, 212] // structural rules
+const NEUTRAL:  [number, number, number] = [150, 146, 140] // offered / struck items
+
+const STRINGS = {
+  fr: {
+    quote: 'DEVIS', preparedFor: 'PRÉPARÉ POUR', deliveryDate: 'DATE DE LIVRAISON',
+    description: 'DÉSIGNATION', qty: 'QTÉ', unitPrice: 'PRIX UNITAIRE', amount: 'MONTANT',
+    subtotal: 'Sous-total', discount: 'Remise', offered: 'Offert', total: 'TOTAL',
+    thankYou: 'Merci de votre confiance.', none: '—', itemFallback: 'Article', fileStem: 'Paperly_Devis',
+  },
+  en: {
+    quote: 'QUOTE', preparedFor: 'PREPARED FOR', deliveryDate: 'DELIVERY DATE',
+    description: 'DESCRIPTION', qty: 'QTY', unitPrice: 'UNIT PRICE', amount: 'AMOUNT',
+    subtotal: 'Subtotal', discount: 'Discount', offered: 'Complimentary', total: 'TOTAL',
+    thankYou: 'Thank you for your trust.', none: '—', itemFallback: 'Item', fileStem: 'Paperly_Quote',
+  },
+} as const
+
+/** Money, language-aware. Value first, then ₪ (Israeli convention). 2 decimals, matches screen. */
+function fmtMoney(n: number, lang: 'fr' | 'en'): string {
+  const fixed = Math.abs(n).toFixed(2)
+  const s = lang === 'fr'
+    ? fixed.replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+    : fixed.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return s + ' ₪'
+}
+
+function fmtDate(iso: string, lang: 'fr' | 'en'): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString(
+    lang === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+}
 
 function generateQuoteRef(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -39,295 +70,149 @@ function generateQuoteRef(): string {
   return 'Q-' + ref
 }
 
-function fmtMoney(n: number): string {
-  // "1 234,50 ₪" — 2 décimales, séparateur espace normale (rendu fiable dans le PDF),
-  // cohérent au centime avec l'écran (fmtCurrency). ₪ = U+20AA, présent dans Inter.
-  const s = n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-  return s + ' ₪'
-}
-
 function registerFonts(doc: jsPDF) {
-  // Inter
   doc.addFileToVFS('Inter-Regular.ttf', PDF_FONTS.InterRegular)
   doc.addFont('Inter-Regular.ttf', 'Inter', 'normal')
   doc.addFileToVFS('Inter-Bold.ttf', PDF_FONTS.InterBold)
   doc.addFont('Inter-Bold.ttf', 'Inter', 'bold')
   doc.addFileToVFS('Inter-SemiBold.ttf', PDF_FONTS.InterSemiBold)
   doc.addFont('Inter-SemiBold.ttf', 'InterSB', 'normal')
-
-  // Cormorant Garamond
   doc.addFileToVFS('Cormorant-Bold.ttf', PDF_FONTS.CormorantBold)
   doc.addFont('Cormorant-Bold.ttf', 'Cormorant', 'bold')
   doc.addFileToVFS('Cormorant-Italic.ttf', PDF_FONTS.CormorantItalic)
   doc.addFont('Cormorant-Italic.ttf', 'Cormorant', 'italic')
 }
 
-export function generateQuotePdf(data: PdfQuoteData) {
+export function generateQuotePdf(data: PdfQuoteData, opts: GenerateQuoteOptions) {
+  const { lang } = opts
+  const t = STRINGS[lang]
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   registerFonts(doc)
 
-  const pageW = 210
-  const pageH = 297
-  const mL = 18
-  const mR = 18
-  const contentW = pageW - mL - mR
+  const pageW = 210, pageH = 297
+  const mL = 20, mR = 20
   const rightEdge = pageW - mR
 
-  // ── Page background ──
-  doc.setFillColor(...PAGE_BG)
+  doc.setFillColor(...PAPER)
   doc.rect(0, 0, pageW, pageH, 'F')
 
-  // ── Left gold accent stripe ──
-  doc.setFillColor(...GOLD)
-  doc.rect(0, 0, 2.5, pageH, 'F')
+  const rule = (x1: number, y: number, x2: number, rgb = HAIRLINE, w = 0.2) => {
+    doc.setDrawColor(...rgb); doc.setLineWidth(w); doc.line(x1, y, x2, y)
+  }
 
-  // ══════════════ HEADER ══════════════
+  // ══════════ MASTHEAD ══════════
+  const logoH = 13
+  const logoW = logoH * PDF_LOGO.ratio
+  doc.addImage(PDF_LOGO.paperMark, 'PNG', mL, 13, logoW, logoH)
 
-  // PAPERLY in Inter Bold
-  doc.setFont('Inter', 'bold')
-  doc.setFontSize(24)
-  doc.setTextColor(...NEAR_BLACK)
-  doc.text('PAPERLY', mL, 26)
-  const pw = doc.getTextWidth('PAPERLY ')
-
-  // STUDIO in Cormorant Italic
-  doc.setFont('Cormorant', 'italic')
-  doc.setFontSize(26)
-  doc.setTextColor(...GOLD)
-  doc.text('STUDIO', mL + pw, 26)
-
-  // Tagline
-  doc.setFont('Inter', 'normal')
-  doc.setFontSize(6.5)
-  doc.setTextColor(...WARM_GRAY)
-  doc.text('CREATIVE DIRECTION FOR PREMIUM EVENTS', mL, 32)
-
-  // Right: quote ref + date
   const quoteRef = data.quoteRef || generateQuoteRef()
-  doc.setFont('Inter', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(...GOLD)
-  doc.text(quoteRef, rightEdge, 22, { align: 'right' })
+  doc.setFont('InterSB', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...INK)
+  doc.text(quoteRef, rightEdge, 19, { align: 'right' })
+  const today = new Date().toLocaleDateString(
+    lang === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  doc.setFont('Inter', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...INK_SOFT)
+  doc.text(today, rightEdge, 25, { align: 'right' })
 
-  const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-  doc.setFont('Inter', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(...WARM_GRAY)
-  doc.text(today, rightEdge, 28, { align: 'right' })
+  rule(mL, 34, rightEdge)
 
-  // Hairline divider
-  doc.setDrawColor(...DIVIDER)
-  doc.setLineWidth(0.15)
-  doc.line(mL, 36, rightEdge, 36)
+  // ── short-quote balancing: shift the body down so a short quote sits composed ──
+  const n = data.items.length
+  const rowH = 13
+  const hasDiscount = data.discountAmount > 0
+  const bodyH = 28 + 16 + 9 + n * rowH + 12 + (hasDiscount ? 35 : 28)
+  const naturalTop = 46
+  const footerRuleY = 278
+  const slack = (footerRuleY - 16) - (naturalTop + bodyH)
+  const shift = slack > 0 ? Math.min(slack * 0.42, 38) : 0
+  let y = naturalTop + shift
 
-  // ══════════════ QUOTE LABEL ══════════════
-  doc.setFont('Inter', 'bold')
-  doc.setFontSize(9)
-  doc.setTextColor(...GOLD)
-  doc.text('QUOTE', mL, 43)
-  doc.setDrawColor(...GOLD)
-  doc.setLineWidth(0.5)
-  doc.line(mL, 45, mL + 22, 45)
+  // ══════════ DEVIS · CLIENT (hero) · DELIVERY ══════════
+  doc.setFont('Inter', 'normal'); doc.setFontSize(8); doc.setTextColor(...INK_SOFT)
+  doc.text(t.quote, mL, y, { charSpace: 0.8 })
+  doc.text(t.deliveryDate, rightEdge, y, { align: 'right', charSpace: 0.5 })
 
-  // ══════════════ CLIENT INFO BLOCK ══════════════
-  const cY = 50
-  const cH = data.notes ? 30 : 26
-  doc.setFillColor(...LIGHT_CREAM)
-  doc.roundedRect(mL, cY, contentW, cH, 3, 3, 'F')
+  y += 11
+  doc.setFont('Cormorant', 'bold'); doc.setFontSize(30); doc.setTextColor(...INK)
+  doc.text(data.clientName, mL, y)
+  doc.setFont('InterSB', 'normal'); doc.setFontSize(12); doc.setTextColor(...INK)
+  doc.text(data.deliveryDate ? fmtDate(data.deliveryDate, lang) : t.none, rightEdge, y, { align: 'right' })
 
-  const pad = 8
-
-  // PREPARED FOR label
-  doc.setFont('Inter', 'normal')
-  doc.setFontSize(7)
-  doc.setTextColor(...WARM_GRAY)
-  doc.text('PREPARED FOR', mL + pad, cY + 8)
-
-  // Client name in Cormorant Bold
-  doc.setFont('Cormorant', 'bold')
-  doc.setFontSize(18)
-  doc.setTextColor(...NEAR_BLACK)
-  doc.text(data.clientName, mL + pad, cY + 17)
-
-  // Notes
-  if (data.notes) {
-    doc.setFont('Cormorant', 'italic')
-    doc.setFontSize(9)
-    doc.setTextColor(...WARM_GRAY)
-    doc.text(data.notes, mL + pad, cY + 24)
-  }
-
-  // DELIVERY DATE
-  doc.setFont('Inter', 'normal')
-  doc.setFontSize(7)
-  doc.setTextColor(...WARM_GRAY)
-  doc.text('DELIVERY DATE', rightEdge - pad, cY + 8, { align: 'right' })
-
-  doc.setFont('InterSB', 'normal')
-  doc.setFontSize(12)
-  doc.setTextColor(...NEAR_BLACK)
-  if (data.deliveryDate) {
-    const dDate = new Date(data.deliveryDate + 'T00:00:00').toLocaleDateString('fr-FR', {
-      day: 'numeric', month: 'long', year: 'numeric',
-    })
-    doc.text(dDate, rightEdge - pad, cY + 16, { align: 'right' })
-  } else {
-    doc.text('—', rightEdge - pad, cY + 16, { align: 'right' })
-  }
-
-  // ══════════════ LINE ITEMS TABLE ══════════════
-  let y = cY + cH + 8
-
-  const col = {
-    num: mL + 6,
-    desc: mL + 16,
-    qty: 118,
-    price: 152,
-    total: rightEdge,
-  }
-
-  // ── Table header (dark bar) ──
-  const hdrH = 9
-  doc.setFillColor(...NEAR_BLACK)
-  doc.roundedRect(mL, y, contentW, hdrH, 2, 2, 'F')
-  doc.rect(mL, y + hdrH - 2, contentW, 2, 'F')
-
-  doc.setFont('InterSB', 'normal')
-  doc.setFontSize(7)
-  doc.setTextColor(...PAGE_BG)
-  doc.text('#', mL + 6, y + 6)
-  doc.text('DESCRIPTION', mL + 16, y + 6)
-  doc.text('QTY', col.qty, y + 6, { align: 'right' })
-  doc.text('UNIT PRICE', col.price, y + 6, { align: 'right' })
-  doc.text('TOTAL', col.total, y + 6, { align: 'right' })
-
-  y += hdrH
-
-  // ── Item rows ──
-  const rowH = 11
-  data.items.forEach((item, idx) => {
-    if (idx % 2 === 1) {
-      doc.setFillColor(...LIGHT_CREAM)
-      doc.rect(mL, y, contentW, rowH, 'F')
-    }
-
-    const mid = y + rowH / 2 + 1
-
-    // Row number circle
-    doc.setFillColor(...MUTED_CIRCLE)
-    doc.circle(col.num, y + rowH / 2, 3.2, 'F')
-    doc.setFont('Inter', 'bold')
-    doc.setFontSize(7.5)
-    doc.setTextColor(...WARM_GRAY)
-    doc.text(String(idx + 1), col.num, mid, { align: 'center' })
-
-    // Description
-    doc.setFont('Inter', 'normal')
-    doc.setFontSize(9.5)
-    doc.setTextColor(...NEAR_BLACK)
-    const descText = item.name || 'Item'
-    doc.text(descText, col.desc, mid)
-
-    if (item.isOffered) {
-      const dw = doc.getTextWidth(descText)
-      doc.setFont('Cormorant', 'italic')
-      doc.setFontSize(9)
-      doc.setTextColor(...GOLD)
-      doc.text(' — Offert', col.desc + dw, mid)
-
-      doc.setFont('Inter', 'normal')
-      doc.setFontSize(9.5)
-      doc.setTextColor(...WARM_GRAY)
-      doc.text('—', col.total, mid, { align: 'right' })
-    } else {
-      doc.setFont('Inter', 'normal')
-      doc.setFontSize(9.5)
-      doc.setTextColor(...NEAR_BLACK)
-      doc.text(item.hideQty ? '—' : String(item.quantity), col.qty, mid, { align: 'right' })
-
-      doc.text(fmtMoney(item.unitPrice), col.price, mid, { align: 'right' })
-
-      const lt = item.quantity * item.unitPrice
-      doc.setFont('Inter', 'bold')
-      doc.text(fmtMoney(lt), col.total, mid, { align: 'right' })
-    }
-
-    y += rowH
-  })
-
-  // Bottom table border
-  doc.setDrawColor(...DIVIDER)
-  doc.setLineWidth(0.15)
-  doc.line(mL, y, rightEdge, y)
-
-  // ══════════════ TOTALS ══════════════
-  y += 10
-  const totW = 85
-  const totL = rightEdge - totW
-
-  // Subtotal
-  doc.setFont('Inter', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(...WARM_GRAY)
-  doc.text('Subtotal', totL, y)
-  doc.setFontSize(10)
-  doc.setTextColor(...NEAR_BLACK)
-  doc.text(fmtMoney(data.subtotal), rightEdge, y, { align: 'right' })
-
-  // Discount
-  if (data.discountAmount > 0) {
-    y += 7
-    doc.setFont('Inter', 'normal')
-    doc.setFontSize(9)
-    doc.setTextColor(...WARM_GRAY)
-    doc.text(data.discountLabel || 'Discount', totL, y)
-    doc.setFontSize(10)
-    doc.setTextColor(...DISC_RED)
-    doc.text('− ' + fmtMoney(data.discountAmount), rightEdge, y, { align: 'right' })
-  }
-
-  // Hairline
   y += 6
-  doc.setDrawColor(...DIVIDER)
-  doc.setLineWidth(0.15)
-  doc.line(totL, y, rightEdge, y)
+  rule(mL, y, rightEdge)
 
-  // Total dark box
-  y += 5
-  const boxH = 14
-  doc.setFillColor(...NEAR_BLACK)
-  doc.roundedRect(totL, y, totW, boxH, 3, 3, 'F')
+  if (data.notes) {
+    y += 7
+    doc.setFont('Cormorant', 'italic'); doc.setFontSize(11); doc.setTextColor(...INK_SOFT)
+    doc.text(data.notes, mL, y)
+  }
 
-  // TOTAL label
-  doc.setFont('Inter', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(...PAGE_BG)
-  doc.text('TOTAL', totL + 8, y + 9)
+  // ══════════ LINE ITEMS — hairline columns, no fills ══════════
+  y += 16
+  const colQty = 124, colPrice = 158, colAmt = rightEdge
+  doc.setFont('InterSB', 'normal'); doc.setFontSize(7); doc.setTextColor(...INK_SOFT)
+  doc.text(t.description, mL, y, { charSpace: 0.4 })
+  doc.text(t.qty, colQty, y, { align: 'right', charSpace: 0.4 })
+  doc.text(t.unitPrice, colPrice, y, { align: 'right', charSpace: 0.4 })
+  doc.text(t.amount, colAmt, y, { align: 'right', charSpace: 0.4 })
+  y += 3
+  rule(mL, y, rightEdge)
 
-  // Total amount (₪ inclus, une seule chaîne)
-  doc.setFont('Inter', 'bold')
-  doc.setFontSize(18)
-  doc.setTextColor(...PAGE_BG)
-  doc.text(fmtMoney(data.total), rightEdge - 6, y + 10, { align: 'right' })
+  let rowTop = y
+  data.items.forEach((item) => {
+    const b = rowTop + 9
+    const nameText = item.name || t.itemFallback
+    doc.setFont('Cormorant', 'bold'); doc.setFontSize(13.5); doc.setTextColor(...INK)
+    doc.text(nameText, mL, b)
+    if (item.isOffered) {
+      const nw = doc.getTextWidth(nameText)
+      doc.setFont('Cormorant', 'italic'); doc.setFontSize(11.5); doc.setTextColor(...NEUTRAL)
+      doc.text('  ' + t.offered, mL + nw, b)
+      doc.setFont('Inter', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...NEUTRAL)
+      doc.text(t.none, colAmt, b, { align: 'right' })
+    } else {
+      doc.setFont('Inter', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...INK_SOFT)
+      doc.text(item.hideQty ? t.none : String(item.quantity), colQty, b, { align: 'right' })
+      doc.text(fmtMoney(item.unitPrice, lang), colPrice, b, { align: 'right' })
+      doc.setFont('InterSB', 'normal'); doc.setTextColor(...INK)
+      doc.text(fmtMoney(item.quantity * item.unitPrice, lang), colAmt, b, { align: 'right' })
+    }
+    rowTop += rowH
+  })
+  rule(mL, rowTop + 1, rightEdge)
 
-  // ══════════════ FOOTER ══════════════
-  const fY = 274
-  doc.setDrawColor(...DIVIDER)
-  doc.setLineWidth(0.15)
-  doc.line(mL, fY, rightEdge, fY)
+  // ══════════ TOTALS — rule + large figure, no box ══════════
+  y = rowTop + 13
+  const totL = rightEdge - 72
+  doc.setFont('Inter', 'normal'); doc.setFontSize(9); doc.setTextColor(...INK_SOFT)
+  doc.text(t.subtotal, totL, y)
+  doc.setFontSize(10); doc.setTextColor(...INK)
+  doc.text(fmtMoney(data.subtotal, lang), rightEdge, y, { align: 'right' })
 
-  // Thank you in Cormorant Italic
-  doc.setFont('Cormorant', 'italic')
-  doc.setFontSize(11)
-  doc.setTextColor(...GOLD)
-  doc.text('Thank you for choosing Paperly Studio', mL, fY + 8)
+  if (hasDiscount) {
+    y += 7
+    doc.setFont('Inter', 'normal'); doc.setFontSize(9); doc.setTextColor(...INK_SOFT)
+    doc.text(data.discountLabel || t.discount, totL, y)
+    doc.setFontSize(10); doc.setTextColor(...INK_SOFT)
+    doc.text('− ' + fmtMoney(data.discountAmount, lang), rightEdge, y, { align: 'right' })
+  }
 
-  doc.setFont('Inter', 'normal')
-  doc.setFontSize(8)
-  doc.setTextColor(...WARM_GRAY)
-  doc.text('paperly.com', rightEdge, fY + 8, { align: 'right' })
+  y += 7
+  rule(totL, y, rightEdge, INK, 0.4)
+  y += 10
+  doc.setFont('InterSB', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...INK)
+  doc.text(t.total, totL, y, { charSpace: 0.7 })
+  doc.setFont('Inter', 'bold'); doc.setFontSize(20); doc.setTextColor(...INK)
+  doc.text(fmtMoney(data.total, lang), rightEdge, y, { align: 'right' })
 
-  // Save
-  const fileName = 'Paperly_Quote_' + data.clientName.replace(/\s+/g, '_') + '.pdf'
+  // ══════════ FOOTER (pinned) ══════════
+  rule(mL, footerRuleY, rightEdge)
+  doc.setFont('Cormorant', 'italic'); doc.setFontSize(11.5); doc.setTextColor(...INK_SOFT)
+  doc.text(t.thankYou, mL, footerRuleY + 7)
+  doc.setFont('Inter', 'normal'); doc.setFontSize(8); doc.setTextColor(...INK)
+  doc.text('Sacha Guez  ·  +972-58-6170698', rightEdge, footerRuleY + 6, { align: 'right' })
+  doc.setTextColor(...INK_SOFT)
+  doc.text('sachaguez.mt@gmail.com', rightEdge, footerRuleY + 10.5, { align: 'right' })
+
+  const fileName = t.fileStem + '_' + data.clientName.replace(/\s+/g, '_') + '.pdf'
   doc.save(fileName)
 }
