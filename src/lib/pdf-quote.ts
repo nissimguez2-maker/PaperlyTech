@@ -30,7 +30,7 @@ export interface GenerateQuoteOptions {
 // ── Palette — pure black on warm-white, hairlines only. No accent colour. ──
 const PAPER:    [number, number, number] = [253, 252, 250] // warm-white ground (only fill)
 const INK:      [number, number, number] = [26, 24, 22]    // near-black — names, totals
-const INK_SOFT: [number, number, number] = [122, 118, 112] // labels, dates, footer
+const INK_SOFT: [number, number, number] = [88, 80, 72]    // labels, dates, footer (darkened for legibility)
 const HAIRLINE: [number, number, number] = [222, 218, 212] // structural rules
 const NEUTRAL:  [number, number, number] = [150, 146, 140] // offered / struck items
 
@@ -139,7 +139,7 @@ export function generateQuotePdf(data: PdfQuoteData, opts: GenerateQuoteOptions)
   // ══════════ LINE ITEMS — hairline columns, no fills ══════════
   y += 16
   const colQty = 124, colPrice = 158, colAmt = rightEdge
-  doc.setFont('InterSB', 'normal'); doc.setFontSize(7); doc.setTextColor(...INK_SOFT)
+  doc.setFont('InterSB', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...INK_SOFT)
   doc.text(t.description, mL, y, { charSpace: 0.4 })
   doc.text(t.qty, colQty, y, { align: 'right', charSpace: 0.4 })
   doc.text(t.unitPrice, colPrice, y, { align: 'right', charSpace: 0.4 })
@@ -175,16 +175,16 @@ export function generateQuotePdf(data: PdfQuoteData, opts: GenerateQuoteOptions)
   // ══════════ TOTALS — rule + large figure, no box ══════════
   y = rowTop + 13
   const totL = rightEdge - 72
-  doc.setFont('Inter', 'normal'); doc.setFontSize(9); doc.setTextColor(...INK_SOFT)
+  doc.setFont('Inter', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...INK_SOFT)
   doc.text(t.subtotal, totL, y)
-  doc.setFontSize(10); doc.setTextColor(...INK)
+  doc.setFontSize(10.5); doc.setTextColor(...INK)
   doc.text(fmtMoney(data.subtotal, lang), rightEdge, y, { align: 'right' })
 
   if (hasDiscount) {
     y += 7
-    doc.setFont('Inter', 'normal'); doc.setFontSize(9); doc.setTextColor(...INK_SOFT)
+    doc.setFont('Inter', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...INK_SOFT)
     doc.text(data.discountLabel || t.discount, totL, y)
-    doc.setFontSize(10); doc.setTextColor(...INK_SOFT)
+    doc.setFontSize(10.5); doc.setTextColor(...INK_SOFT)
     doc.text('− ' + fmtMoney(data.discountAmount, lang), rightEdge, y, { align: 'right' })
   }
 
@@ -198,12 +198,12 @@ export function generateQuotePdf(data: PdfQuoteData, opts: GenerateQuoteOptions)
 
   // ══════════ FOOTER (pinned) ══════════
   rule(mL, footerRuleY, rightEdge)
-  doc.setFont('Cormorant', 'italic'); doc.setFontSize(11.5); doc.setTextColor(...INK_SOFT)
-  doc.text(t.thankYou, mL, footerRuleY + 7)
-  doc.setFont('Inter', 'normal'); doc.setFontSize(8); doc.setTextColor(...INK)
-  doc.text('Sacha Guez  ·  +972-58-6170698', rightEdge, footerRuleY + 6, { align: 'right' })
-  doc.setTextColor(...INK_SOFT)
-  doc.text('sachaguez.mt@gmail.com', rightEdge, footerRuleY + 10.5, { align: 'right' })
+  doc.setFont('Cormorant', 'italic'); doc.setFontSize(12.5); doc.setTextColor(...INK_SOFT)
+  doc.text(t.thankYou, mL, footerRuleY + 8)
+  doc.setFont('Inter', 'normal'); doc.setFontSize(9); doc.setTextColor(...INK)
+  doc.text('Sacha Guez  ·  +972-58-6170698', rightEdge, footerRuleY + 7, { align: 'right' })
+  doc.setFont('Inter', 'normal'); doc.setFontSize(9); doc.setTextColor(...INK_SOFT)
+  doc.text('sachaguez.mt@gmail.com', rightEdge, footerRuleY + 12, { align: 'right' })
 
   const fileName = t.fileStem + '_' + data.clientName.replace(/\s+/g, '_') + '.pdf'
   doc.save(fileName)
