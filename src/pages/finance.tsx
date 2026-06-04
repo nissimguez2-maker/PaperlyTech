@@ -138,7 +138,7 @@ export function FinancePage() {
       <PageHeader title="Finances" subtitle="Où se trouve votre argent" />
 
       {/* Pipeline Money KPIs */}
-      <div className="mb-8 grid grid-cols-3 gap-4">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-navy-bg p-2.5">
@@ -185,7 +185,7 @@ export function FinancePage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Monthly breakdown */}
         <div className="col-span-2">
           <Card>

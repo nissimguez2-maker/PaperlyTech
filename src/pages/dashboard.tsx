@@ -134,7 +134,7 @@ export function DashboardPage() {
       />
 
       {/* KPI Cards */}
-      <div className="mb-8 grid grid-cols-5 gap-4">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         <Card>
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-forest-bg p-2.5">
@@ -199,7 +199,7 @@ export function DashboardPage() {
       </div>
 
       {/* Two-column layout */}
-      <div className="grid grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Left column: Active projects + Next deliveries */}
         <div className="col-span-3 space-y-6">
           {/* Next Deliveries */}

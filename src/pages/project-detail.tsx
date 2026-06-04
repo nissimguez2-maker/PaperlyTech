@@ -330,7 +330,7 @@ export function ProjectDetailPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="col-span-2 space-y-6">
           <Card>
             <div className="mb-4 flex items-center justify-between">

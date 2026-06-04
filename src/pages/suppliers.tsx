@@ -91,7 +91,7 @@ export function SuppliersPage() {
           action={{ label: 'Ajouter un fournisseur', onClick: () => setShowAdd(true) }}
         />
       ) : (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {suppliers.map(s => (
             <Card key={s.id} className="group">
               <div className="flex items-start justify-between">

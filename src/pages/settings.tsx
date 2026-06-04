@@ -14,7 +14,7 @@ export function SettingsPage() {
       <div className="max-w-2xl space-y-6">
         <Card>
           <CardTitle>Informations du studio</CardTitle>
-          <div className="mt-4 grid grid-cols-2 gap-4">
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input label="Nom du studio" defaultValue="Paperly" />
             <Input label="E-mail de contact" defaultValue={user?.email ?? ''} />
             <Input label="Téléphone" placeholder="+972 ..." />
@@ -30,7 +30,7 @@ export function SettingsPage() {
           <p className="mt-2 text-sm text-muted">
             Personnalisez l'apparence de vos devis exportés.
           </p>
-          <div className="mt-4 grid grid-cols-2 gap-4">
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input label="Nom affiché sur le PDF" defaultValue="Paperly" />
             <Input label="Nom du contact" defaultValue="Sacha Guez" />
             <Input label="E-mail sur le PDF" defaultValue="" placeholder="contact@paperly.com" />

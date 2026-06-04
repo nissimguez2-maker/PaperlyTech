@@ -328,10 +328,10 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         }
       />
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="col-span-2 space-y-6">
           <Card>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {/* Client autocomplete */}
               <div ref={clientRef} className="relative">
                 <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">Nom du client</label>
