@@ -160,10 +160,12 @@ export function generateQuotePdf(data: PdfQuoteData, opts: GenerateQuoteOptions)
       doc.setFont('Inter', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...NEUTRAL)
       doc.text(t.none, colAmt, b, { align: 'right' })
     } else {
-      doc.setFont('Inter', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...INK_SOFT)
+      // qty + unit price: dark and a touch larger so they read clearly (supporting weight)
+      doc.setFont('Inter', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...INK)
       doc.text(item.hideQty ? t.none : String(item.quantity), colQty, b, { align: 'right' })
       doc.text(fmtMoney(item.unitPrice, lang), colPrice, b, { align: 'right' })
-      doc.setFont('InterSB', 'normal'); doc.setTextColor(...INK)
+      // amount: the result — semibold + largest figure on the line
+      doc.setFont('InterSB', 'normal'); doc.setFontSize(11.5); doc.setTextColor(...INK)
       doc.text(fmtMoney(item.quantity * item.unitPrice, lang), colAmt, b, { align: 'right' })
     }
     rowTop += rowH
