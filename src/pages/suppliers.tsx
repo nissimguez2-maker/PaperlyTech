@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useToast } from '@/components/ui/toast'
 import { fmtCurrency } from '@/lib/utils'
@@ -16,6 +17,7 @@ export function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', contact: '', notes: '' })
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export function SuppliersPage() {
 
   const addSupplier = useCallback(async () => {
     if (!form.name.trim()) {
-      toast('Enter a name', 'error')
+      toast('Saisissez un nom', 'error')
       return
     }
 
@@ -41,25 +43,24 @@ export function SuppliersPage() {
     }).select('*').single()
 
     if (error || !saved) {
-      toast('Failed to add supplier: ' + (error?.message ?? 'unknown'), 'error')
+      toast('Échec de l’ajout du fournisseur : ' + (error?.message ?? 'inconnu'), 'error')
       return
     }
 
     setSuppliers(prev => [...prev, saved as Supplier])
     setShowAdd(false)
     setForm({ name: '', contact: '', notes: '' })
-    toast('Supplier added')
+    toast('Fournisseur ajouté')
   }, [form, toast])
 
   const deleteSupplier = useCallback(async (id: string) => {
-    if (!confirm('Delete this supplier?')) return
     setSuppliers(prev => prev.filter(s => s.id !== id))
     const { error } = await supabase.from('suppliers').delete().eq('id', id)
     if (error) {
-      toast('Failed to delete: ' + error.message, 'error')
+      toast('Échec de la suppression : ' + error.message, 'error')
       return
     }
-    toast('Supplier deleted')
+    toast('Fournisseur supprimé')
   }, [toast])
 
   if (loading) {
@@ -73,11 +74,11 @@ export function SuppliersPage() {
   return (
     <div>
       <PageHeader
-        title="Suppliers"
-        subtitle="Manage your vendor relationships"
+        title="Fournisseurs"
+        subtitle="Gérez vos relations fournisseurs"
         actions={
           <Button variant="primary" onClick={() => setShowAdd(true)}>
-            <Plus size={16} /> Add Supplier
+            <Plus size={16} /> Ajouter un fournisseur
           </Button>
         }
       />
@@ -85,9 +86,9 @@ export function SuppliersPage() {
       {suppliers.length === 0 ? (
         <EmptyState
           icon={Users}
-          title="No suppliers yet"
-          description="Add your suppliers and their offerings"
-          action={{ label: 'Add Supplier', onClick: () => setShowAdd(true) }}
+          title="Aucun fournisseur"
+          description="Ajoutez vos fournisseurs et leurs prestations"
+          action={{ label: 'Ajouter un fournisseur', onClick: () => setShowAdd(true) }}
         />
       ) : (
         <div className="grid grid-cols-2 gap-4">
@@ -108,9 +109,9 @@ export function SuppliersPage() {
                   )}
                 </div>
                 <button
-                  onClick={() => deleteSupplier(s.id)}
+                  onClick={() => setDeletingId(s.id)}
                   className="opacity-0 group-hover:opacity-100 rounded p-1 text-sand hover:text-coral transition-all"
-                  aria-label="Delete supplier"
+                  aria-label="Supprimer le fournisseur"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -131,32 +132,42 @@ export function SuppliersPage() {
         </div>
       )}
 
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Supplier" width="sm">
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Ajouter un fournisseur" width="sm">
         <div className="space-y-4">
           <Input
-            label="Name"
+            label="Nom"
             value={form.name}
             onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            placeholder="Supplier name"
+            placeholder="Nom du fournisseur"
           />
           <Input
             label="Contact"
             value={form.contact}
             onChange={e => setForm(f => ({ ...f, contact: e.target.value }))}
-            placeholder="Phone or email"
+            placeholder="Téléphone ou e-mail"
           />
           <Input
             label="Notes"
             value={form.notes}
             onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-            placeholder="Optional notes"
+            placeholder="Notes facultatives"
           />
           <div className="flex gap-3 justify-end pt-2">
-            <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
-            <Button variant="primary" onClick={addSupplier}>Add Supplier</Button>
+            <Button variant="ghost" onClick={() => setShowAdd(false)}>Annuler</Button>
+            <Button variant="primary" onClick={addSupplier}>Ajouter</Button>
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={deletingId !== null}
+        onClose={() => setDeletingId(null)}
+        onConfirm={() => { if (deletingId) deleteSupplier(deletingId) }}
+        title="Supprimer ce fournisseur ?"
+        message="Ce fournisseur sera définitivement supprimé."
+        confirmLabel="Supprimer"
+        danger
+      />
     </div>
   )
 }

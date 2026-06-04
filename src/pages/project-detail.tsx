@@ -8,6 +8,7 @@ import { Card, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PipelineBadge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/components/ui/toast'
 import { fmtCurrency, fmtDate, safeFloat, cn, PIPELINE_STAGES, PAYMENT_METHODS } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -32,6 +33,7 @@ export function ProjectDetailPage() {
   const [quote, setQuote] = useState<Quote | null>(null)
   const [items, setItems] = useState<ItemLocal[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
+  const [pendingDeleteItemId, setPendingDeleteItemId] = useState<string | null>(null)
 
   const [payAmount, setPayAmount] = useState('')
   const [payMethod, setPayMethod] = useState<PaymentMethod>('wire_transfer')
@@ -130,7 +132,7 @@ export function ProjectDetailPage() {
     if (!quote) return
     const { data } = await supabase.from('quote_items').insert({
       quote_id: quote.id,
-      name: 'New Item',
+      name: 'Nouvel article',
       quantity: 1,
       unit_price: 0,
       is_offered: false,
@@ -142,7 +144,7 @@ export function ProjectDetailPage() {
     if (data) {
       const newItems = [...items, {
         id: data.id,
-        name: 'New Item',
+        name: 'Nouvel article',
         description: null,
         quantity: 1,
         unitPrice: 0,
@@ -183,12 +185,12 @@ export function ProjectDetailPage() {
         }))
         if (taskInserts.length > 0) {
           await supabase.from('tasks').insert(taskInserts)
-          toast(taskInserts.length + ' tasks created')
+          toast(taskInserts.length + ' tâche' + (taskInserts.length > 1 ? 's' : '') + ' créée' + (taskInserts.length > 1 ? 's' : ''))
         }
       }
     }
 
-    toast('Stage changed to ' + PIPELINE_STAGES[stage].label)
+    toast('Étape changée en ' + PIPELINE_STAGES[stage].label)
   }, [project, items, remaining, toast])
 
   const addPayment = useCallback(async () => {
@@ -205,14 +207,14 @@ export function ProjectDetailPage() {
     }).select('*').single()
 
     if (error || !data) {
-      toast('Failed to add payment', 'error')
+      toast('Échec de l’ajout du paiement', 'error')
       return
     }
 
     setPayments(prev => [data as Payment, ...prev])
     setPayAmount('')
     setPayNote('')
-    toast('Payment added')
+    toast('Paiement ajouté')
   }, [project, payAmount, payDate, payMethod, payNote, toast])
 
   if (loading) {
@@ -226,8 +228,8 @@ export function ProjectDetailPage() {
   if (!project) {
     return (
       <div className="text-center py-20">
-        <p className="text-muted">Project not found</p>
-        <Link to="/projects" className="text-gold-dark hover:underline text-sm mt-2 inline-block">Back to Projects</Link>
+        <p className="text-muted">Projet introuvable</p>
+        <Link to="/projects" className="text-gold-dark hover:underline text-sm mt-2 inline-block">Retour aux projets</Link>
       </div>
     )
   }
@@ -238,7 +240,7 @@ export function ProjectDetailPage() {
     <div>
       <div className="mb-4">
         <Link to="/projects" className="inline-flex items-center gap-1 text-sm text-muted hover:text-bark transition-colors">
-          <ArrowLeft size={14} /> Back to Projects
+          <ArrowLeft size={14} /> Retour aux projets
         </Link>
       </div>
 
@@ -265,20 +267,20 @@ export function ProjectDetailPage() {
         <div className="col-span-2 space-y-6">
           <Card>
             <div className="mb-4 flex items-center justify-between">
-              <CardTitle>Items</CardTitle>
+              <CardTitle>Articles</CardTitle>
               <Button variant="primary" size="sm" onClick={addItem}>
-                <Plus size={14} /> Add Item
+                <Plus size={14} /> Ajouter un article
               </Button>
             </div>
 
             {items.length === 0 ? (
-              <p className="text-sm text-muted py-4 text-center">No items yet</p>
+              <p className="text-sm text-muted py-4 text-center">Aucun article pour le moment</p>
             ) : (
               <div className="space-y-1">
                 <div className="grid grid-cols-[1fr_70px_90px_90px_60px] gap-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted mb-2">
-                  <div>Name</div>
-                  <div>Qty</div>
-                  <div>Price</div>
+                  <div>Nom</div>
+                  <div>Qté</div>
+                  <div>Prix</div>
                   <div>Total</div>
                   <div />
                 </div>
@@ -305,18 +307,18 @@ export function ProjectDetailPage() {
                       className="rounded border border-transparent bg-transparent px-2 py-1 text-center text-sm text-bark hover:border-sand focus:border-gold-dark focus:outline-none"
                     />
                     <span className={cn('text-center text-sm font-semibold', item.isOffered ? 'text-forest' : 'text-bark')}>
-                      {item.isOffered ? 'Offered' : fmtCurrency(item.quantity * item.unitPrice)}
+                      {item.isOffered ? 'Offert' : fmtCurrency(item.quantity * item.unitPrice)}
                     </span>
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => updateItemField(item.id, 'isOffered', !item.isOffered)}
                         className={cn('rounded p-1', item.isOffered ? 'text-forest' : 'text-sand hover:text-muted')}
-                        title={item.isOffered ? 'Remove offer' : 'Mark as offered'}
+                        title={item.isOffered ? 'Retirer l’offre' : 'Marquer comme offert'}
                       >
                         <Gift size={14} />
                       </button>
                       <button
-                        onClick={() => removeItem(item.id)}
+                        onClick={() => setPendingDeleteItemId(item.id)}
                         className="opacity-0 group-hover:opacity-100 rounded p-1 text-sand hover:text-coral transition-all"
                       >
                         <Trash2 size={14} />
@@ -334,9 +336,9 @@ export function ProjectDetailPage() {
           </Card>
 
           <Card>
-            <CardTitle>Payments</CardTitle>
+            <CardTitle>Paiements</CardTitle>
             {payments.length === 0 ? (
-              <p className="text-sm text-muted py-4 text-center mt-2">No payments recorded</p>
+              <p className="text-sm text-muted py-4 text-center mt-2">Aucun paiement enregistré</p>
             ) : (
               <div className="mt-3 space-y-2">
                 {payments.map(p => (
@@ -355,18 +357,18 @@ export function ProjectDetailPage() {
 
         <div className="space-y-6">
           <Card>
-            <CardTitle>Summary</CardTitle>
+            <CardTitle>Récapitulatif</CardTitle>
             <div className="mt-3 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted">Quote Total</span>
+                <span className="text-muted">Total du devis</span>
                 <span className="font-medium">{fmtCurrency(quoteTotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted">Paid</span>
+                <span className="text-muted">Payé</span>
                 <span className="font-medium text-forest">{fmtCurrency(totalPaid)}</span>
               </div>
               <div className="flex justify-between border-t border-sand/40 pt-2">
-                <span className="text-sm font-semibold text-bark">Remaining</span>
+                <span className="text-sm font-semibold text-bark">Restant</span>
                 <span className="text-lg font-bold text-bark">{fmtCurrency(remaining)}</span>
               </div>
             </div>
@@ -382,7 +384,7 @@ export function ProjectDetailPage() {
 
             {project.delivery_date && (
               <div className="mt-4 text-xs text-muted">
-                Delivery: {fmtDate(project.delivery_date)}
+                Livraison : {fmtDate(project.delivery_date)}
               </div>
             )}
           </Card>
@@ -390,11 +392,11 @@ export function ProjectDetailPage() {
           <Card>
             <CardTitle>
               <CreditCard size={16} className="inline mr-2" />
-              Add Payment
+              Ajouter un paiement
             </CardTitle>
             <div className="mt-3 space-y-3">
               <Input
-                label="Amount (NIS)"
+                label="Montant (₪)"
                 type="number"
                 value={payAmount}
                 onChange={e => setPayAmount(e.target.value)}
@@ -407,7 +409,7 @@ export function ProjectDetailPage() {
                 onChange={e => setPayDate(e.target.value)}
               />
               <div>
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">Method</label>
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">Méthode</label>
                 <select
                   value={payMethod}
                   onChange={e => setPayMethod(e.target.value as PaymentMethod)}
@@ -422,15 +424,25 @@ export function ProjectDetailPage() {
                 label="Note"
                 value={payNote}
                 onChange={e => setPayNote(e.target.value)}
-                placeholder="Optional note..."
+                placeholder="Note facultative..."
               />
               <Button variant="primary" className="w-full" onClick={addPayment} disabled={!payAmount || safeFloat(payAmount) <= 0}>
-                <Save size={14} /> Record Payment
+                <Save size={14} /> Enregistrer le paiement
               </Button>
             </div>
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={pendingDeleteItemId !== null}
+        onClose={() => setPendingDeleteItemId(null)}
+        onConfirm={() => { if (pendingDeleteItemId) removeItem(pendingDeleteItemId) }}
+        title="Supprimer cette ligne ?"
+        message="Cette ligne sera retirée du devis."
+        confirmLabel="Supprimer"
+        danger
+      />
     </div>
   )
 }

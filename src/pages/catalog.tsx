@@ -6,6 +6,9 @@ import {
 import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Modal } from '@/components/ui/modal'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useToast } from '@/components/ui/toast'
 import { fmtCurrency, cn, safeFloat } from '@/lib/utils'
@@ -25,6 +28,13 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
   const [editingCat, setEditingCat] = useState<{ id: string; name: string } | null>(null)
   const [editingArt, setEditingArt] = useState<{ id: string; name: string; price: string } | null>(null)
 
+  // Modale d'ajout de catégorie / sous-catégorie (parentId null => catégorie racine)
+  const [catModal, setCatModal] = useState<{ parentId: string | null; name: string } | null>(null)
+  // Modale d'ajout d'article (rattaché à une catégorie)
+  const [artModal, setArtModal] = useState<{ catId: string; name: string; price: string } | null>(null)
+  // Confirmation de suppression d'une catégorie
+  const [deletingCatId, setDeletingCatId] = useState<string | null>(null)
+
   const toggle = (id: string) => {
     setExpanded(prev => {
       const next = new Set(prev)
@@ -34,36 +44,26 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
     })
   }
 
-  const addTopCategory = useCallback(async () => {
-    const name = prompt('Category name:')
-    if (!name?.trim()) return
-    const { data, error } = await supabase.from('categories').insert({ name: name.trim(), parent_id: null }).select().single()
-    if (error || !data) { toast('Failed to add category: ' + (error?.message ?? 'unknown'), 'error'); return }
+  const submitCategory = useCallback(async () => {
+    if (!catModal || !catModal.name.trim()) return
+    const parentId = catModal.parentId
+    const { data, error } = await supabase.from('categories').insert({ name: catModal.name.trim(), parent_id: parentId }).select().single()
+    if (error || !data) { toast('Échec de l’ajout de la catégorie : ' + (error?.message ?? 'inconnu'), 'error'); return }
     onUpdateCategories([...categories, data as Category])
-    toast('Category added')
-  }, [categories, onUpdateCategories, toast])
+    setCatModal(null)
+    toast(parentId ? 'Sous-catégorie ajoutée' : 'Catégorie ajoutée')
+  }, [catModal, categories, onUpdateCategories, toast])
 
-  const addSubCategory = useCallback(async (parentId: string) => {
-    const name = prompt('Sub-category name:')
-    if (!name?.trim()) return
-    const { data, error } = await supabase.from('categories').insert({ name: name.trim(), parent_id: parentId }).select().single()
-    if (error || !data) { toast('Failed to add sub-category: ' + (error?.message ?? 'unknown'), 'error'); return }
-    onUpdateCategories([...categories, data as Category])
-    toast('Sub-category added')
-  }, [categories, onUpdateCategories, toast])
-
-  const addArticle = useCallback(async (catId: string) => {
-    const name = prompt('Article name:')
-    if (!name?.trim()) return
-    const price = prompt('Price:')
-    const { data, error } = await supabase.from('articles').insert({ category_id: catId, name: name.trim(), price: parseFloat(price ?? '0') || 0, note: null }).select().single()
-    if (error || !data) { toast('Failed to add article: ' + (error?.message ?? 'unknown'), 'error'); return }
+  const submitArticle = useCallback(async () => {
+    if (!artModal || !artModal.name.trim()) return
+    const { data, error } = await supabase.from('articles').insert({ category_id: artModal.catId, name: artModal.name.trim(), price: safeFloat(artModal.price), note: null }).select().single()
+    if (error || !data) { toast('Échec de l’ajout de l’article : ' + (error?.message ?? 'inconnu'), 'error'); return }
     onUpdateArticles([...articles, data as Article])
-    toast('Article added')
-  }, [articles, onUpdateArticles, toast])
+    setArtModal(null)
+    toast('Article ajouté')
+  }, [artModal, articles, onUpdateArticles, toast])
 
   const deleteCategory = useCallback(async (id: string) => {
-    if (!confirm('Delete this category and all its contents?')) return
     const desc = getAllDescendants(id, categories)
     const allIds = [id, ...desc]
     onUpdateCategories(categories.filter(c => !allIds.includes(c.id)))
@@ -71,23 +71,23 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
     // Delete articles in these categories first, then categories
     await supabase.from('articles').delete().in('category_id', allIds)
     const { error } = await supabase.from('categories').delete().in('id', allIds)
-    if (error) toast('Failed to delete: ' + error.message, 'error')
-    else toast('Category deleted')
+    if (error) toast('Échec de la suppression : ' + error.message, 'error')
+    else toast('Catégorie supprimée')
   }, [categories, articles, onUpdateCategories, onUpdateArticles, toast])
 
   const deleteArticle = useCallback(async (id: string) => {
     onUpdateArticles(articles.filter(a => a.id !== id))
     const { error } = await supabase.from('articles').delete().eq('id', id)
-    if (error) toast('Failed to delete: ' + error.message, 'error')
-    else toast('Article deleted')
+    if (error) toast('Échec de la suppression : ' + error.message, 'error')
+    else toast('Article supprimé')
   }, [articles, onUpdateArticles, toast])
 
   const saveCatEdit = useCallback(async () => {
     if (!editingCat || !editingCat.name.trim()) return
     onUpdateCategories(categories.map(c => c.id === editingCat.id ? { ...c, name: editingCat.name.trim() } : c))
     const { error } = await supabase.from('categories').update({ name: editingCat.name.trim() }).eq('id', editingCat.id)
-    if (error) toast('Failed to update: ' + error.message, 'error')
-    else toast('Category updated')
+    if (error) toast('Échec de la mise à jour : ' + error.message, 'error')
+    else toast('Catégorie mise à jour')
     setEditingCat(null)
   }, [editingCat, categories, onUpdateCategories, toast])
 
@@ -96,8 +96,8 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
     const newPrice = safeFloat(editingArt.price)
     onUpdateArticles(articles.map(a => a.id === editingArt.id ? { ...a, name: editingArt.name.trim(), price: newPrice } : a))
     const { error } = await supabase.from('articles').update({ name: editingArt.name.trim(), price: newPrice }).eq('id', editingArt.id)
-    if (error) toast('Failed to update: ' + error.message, 'error')
-    else toast('Article updated')
+    if (error) toast('Échec de la mise à jour : ' + error.message, 'error')
+    else toast('Article mis à jour')
     setEditingArt(null)
   }, [editingArt, articles, onUpdateArticles, toast])
 
@@ -147,30 +147,30 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
                 <button
                   onClick={e => { e.stopPropagation(); setEditingCat({ id: cat.id, name: cat.name }) }}
                   className="rounded p-1 text-sand hover:text-bark"
-                  title="Edit category"
+                  title="Modifier la catégorie"
                 >
                   <Pencil size={14} />
                 </button>
                 {level < 2 && (
                   <button
-                    onClick={e => { e.stopPropagation(); addSubCategory(cat.id) }}
+                    onClick={e => { e.stopPropagation(); setCatModal({ parentId: cat.id, name: '' }) }}
                     className="rounded p-1 text-sand hover:text-navy"
-                    title="Add sub-category"
+                    title="Ajouter une sous-catégorie"
                   >
                     <FolderPlus size={14} />
                   </button>
                 )}
                 <button
-                  onClick={e => { e.stopPropagation(); addArticle(cat.id) }}
+                  onClick={e => { e.stopPropagation(); setArtModal({ catId: cat.id, name: '', price: '' }) }}
                   className="rounded p-1 text-sand hover:text-forest"
-                  title="Add article"
+                  title="Ajouter un article"
                 >
                   <Package size={14} />
                 </button>
                 <button
-                  onClick={e => { e.stopPropagation(); deleteCategory(cat.id) }}
+                  onClick={e => { e.stopPropagation(); setDeletingCatId(cat.id) }}
                   className="rounded p-1 text-sand hover:text-coral"
-                  title="Delete category"
+                  title="Supprimer la catégorie"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -218,7 +218,7 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
                         <button
                           onClick={() => setEditingArt({ id: art.id, name: art.name, price: String(art.price) })}
                           className="rounded p-1 text-sand hover:text-bark"
-                          title="Edit article"
+                          title="Modifier l’article"
                         >
                           <Pencil size={12} />
                         </button>
@@ -243,11 +243,11 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
   return (
     <div>
       <PageHeader
-        title="Catalog"
-        subtitle="Manage your article pricing"
+        title="Catalogue"
+        subtitle="Gérez les tarifs de vos articles"
         actions={
-          <Button variant="primary" onClick={addTopCategory}>
-            <Plus size={16} /> Add Category
+          <Button variant="primary" onClick={() => setCatModal({ parentId: null, name: '' })}>
+            <Plus size={16} /> Ajouter une catégorie
           </Button>
         }
       />
@@ -255,15 +255,81 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
       {topLevelCats.length === 0 ? (
         <EmptyState
           icon={Package}
-          title="Empty catalog"
-          description="Add categories and articles to build your pricing catalog"
-          action={{ label: 'Add Category', onClick: addTopCategory }}
+          title="Catalogue vide"
+          description="Ajoutez des catégories et des articles pour construire votre catalogue de tarifs"
+          action={{ label: 'Ajouter une catégorie', onClick: () => setCatModal({ parentId: null, name: '' }) }}
         />
       ) : (
         <Card>
           {topLevelCats.map(cat => renderCategory(cat, 0))}
         </Card>
       )}
+
+      {/* Modale d'ajout de catégorie / sous-catégorie */}
+      <Modal
+        open={catModal !== null}
+        onClose={() => setCatModal(null)}
+        title={catModal?.parentId ? 'Nouvelle sous-catégorie' : 'Nouvelle catégorie'}
+        width="sm"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Nom"
+            value={catModal?.name ?? ''}
+            onChange={e => setCatModal(m => m && { ...m, name: e.target.value })}
+            onKeyDown={e => { if (e.key === 'Enter') submitCategory() }}
+            placeholder="Nom de la catégorie"
+            autoFocus
+          />
+          <div className="flex gap-3 justify-end pt-2">
+            <Button variant="ghost" onClick={() => setCatModal(null)}>Annuler</Button>
+            <Button variant="primary" onClick={submitCategory}>Ajouter</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modale d'ajout d'article */}
+      <Modal
+        open={artModal !== null}
+        onClose={() => setArtModal(null)}
+        title="Nouvel article"
+        width="sm"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Nom"
+            value={artModal?.name ?? ''}
+            onChange={e => setArtModal(m => m && { ...m, name: e.target.value })}
+            onKeyDown={e => { if (e.key === 'Enter') submitArticle() }}
+            placeholder="Nom de l’article"
+            autoFocus
+          />
+          <Input
+            label="Prix (₪)"
+            type="number"
+            step="0.01"
+            value={artModal?.price ?? ''}
+            onChange={e => setArtModal(m => m && { ...m, price: e.target.value })}
+            onKeyDown={e => { if (e.key === 'Enter') submitArticle() }}
+            placeholder="0"
+          />
+          <div className="flex gap-3 justify-end pt-2">
+            <Button variant="ghost" onClick={() => setArtModal(null)}>Annuler</Button>
+            <Button variant="primary" onClick={submitArticle}>Ajouter</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirmation de suppression de catégorie */}
+      <ConfirmDialog
+        open={deletingCatId !== null}
+        onClose={() => setDeletingCatId(null)}
+        onConfirm={() => { if (deletingCatId) deleteCategory(deletingCatId) }}
+        title="Supprimer cette catégorie ?"
+        message="Cette catégorie et tout son contenu seront supprimés."
+        confirmLabel="Supprimer"
+        danger
+      />
     </div>
   )
 }

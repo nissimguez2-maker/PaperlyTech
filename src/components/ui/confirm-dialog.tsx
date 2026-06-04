@@ -14,7 +14,7 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({
   open, onClose, onConfirm, title, message,
-  confirmLabel = 'Confirm', danger = false,
+  confirmLabel = 'Confirmer', danger = false,
 }: ConfirmDialogProps) {
   return (
     <Modal open={open} onClose={onClose} width="sm">
@@ -25,7 +25,7 @@ export function ConfirmDialog({
         <h3 className="mb-2 font-display text-xl font-bold text-bark">{title}</h3>
         <p className="mb-6 text-sm text-muted">{message}</p>
         <div className="flex gap-3">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>Annuler</Button>
           <Button
             variant={danger ? 'danger' : 'primary'}
             onClick={() => { onConfirm(); onClose() }}

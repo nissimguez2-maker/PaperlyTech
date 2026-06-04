@@ -154,11 +154,11 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
   // Single button: Export PDF + Save client/project
   const exportAndSave = async () => {
     if (!client.trim()) {
-      toast('Enter a client name', 'error')
+      toast('Saisissez un nom de client', 'error')
       return
     }
     if (items.length === 0) {
-      toast('Add at least one item', 'error')
+      toast('Ajoutez au moins un article', 'error')
       return
     }
 
@@ -180,7 +180,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
           .insert({ name: client.trim() })
           .select('id')
           .single()
-        if (clientErr || !newClient) throw new Error('Failed to create client')
+        if (clientErr || !newClient) throw new Error('Échec de la création du client')
         clientId = newClient.id
       }
 
@@ -202,11 +202,11 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         })
         .select('id')
         .single()
-      if (projErr || !project) throw new Error('Failed to create project')
+      if (projErr || !project) throw new Error('Échec de la création du projet')
 
       // 4. Build discount label
       const discLabel = discAmount > 0
-        ? (discMode === 'pct' ? 'Discount (' + clampedDiscVal + '%)' : 'Discount (NIS ' + clampedDiscVal + ')')
+        ? (discMode === 'pct' ? 'Remise (' + clampedDiscVal + '%)' : 'Remise (' + clampedDiscVal + ' ₪)')
         : undefined
 
       // 5. Create quote
@@ -224,13 +224,13 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         })
         .select('id')
         .single()
-      if (quoteErr || !quote) throw new Error('Failed to create quote')
+      if (quoteErr || !quote) throw new Error('Échec de la création du devis')
 
       // 6. Create quote items
       const quoteItems = items.map((it, idx) => ({
         quote_id: quote.id,
         article_id: it.articleId || null,
-        name: it.name || 'Item',
+        name: it.name || 'Article',
         description: articleOptions.find(o => o.value === it.articleId)?.label || null,
         quantity: it.qty,
         unit_price: safeFloat(it.unitPrice),
@@ -240,7 +240,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         sort_order: idx,
       }))
       const { error: itemsErr } = await supabase.from('quote_items').insert(quoteItems)
-      if (itemsErr) throw new Error('Failed to create quote items')
+      if (itemsErr) throw new Error('Échec de la création des lignes du devis')
 
       // 7. Generate & download PDF (import dynamique : les polices ne chargent qu'ici)
       const { generateQuotePdf } = await import('@/lib/pdf-quote')
@@ -249,7 +249,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         deliveryDate: deliveryDate || null,
         notes: notes || null,
         items: items.map(it => ({
-          name: it.name || 'Item',
+          name: it.name || 'Article',
           description: articleOptions.find(o => o.value === it.articleId)?.label || null,
           quantity: it.qty,
           unitPrice: safeFloat(it.unitPrice),
@@ -266,10 +266,10 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
       const { data: refreshedClients } = await supabase.from('clients').select('id, name').order('name')
       if (refreshedClients) setAllClients(refreshedClients)
 
-      toast('PDF exported & project saved: ' + projectName)
+      toast('PDF exporté et projet enregistré : ' + projectName)
       clearQuote()
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to save', 'error')
+      toast(err instanceof Error ? err.message : 'Échec de l’enregistrement', 'error')
     } finally {
       setSaving(false)
     }
@@ -278,8 +278,8 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
   return (
     <div>
       <PageHeader
-        title="New Quote"
-        subtitle="Create a quote for a client"
+        title="Nouveau devis"
+        subtitle="Créez un devis pour un client"
         actions={
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => {
@@ -288,7 +288,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
               } else {
                 clearQuote()
               }
-            }}>Clear</Button>
+            }}>Effacer</Button>
           </div>
         }
       />
@@ -299,12 +299,12 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
             <div className="grid grid-cols-3 gap-4">
               {/* Client autocomplete */}
               <div ref={clientRef} className="relative">
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">Client Name</label>
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">Nom du client</label>
                 <input
                   value={client}
                   onChange={e => { setClient(e.target.value); setShowClientDropdown(true) }}
                   onFocus={() => setShowClientDropdown(true)}
-                  placeholder="Type to search or create..."
+                  placeholder="Saisissez pour rechercher ou créer..."
                   className="w-full rounded-xl border border-sand bg-white px-3 py-2.5 text-sm focus:border-gold-dark focus:outline-none"
                 />
                 {showClientDropdown && filteredClients.length > 0 && (
@@ -324,27 +324,27 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                   </div>
                 )}
               </div>
-              <Input label="Delivery Date" type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} />
-              <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes..." />
+              <Input label="Date de livraison" type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} />
+              <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes facultatives..." />
             </div>
           </Card>
 
           <Card>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-display text-lg font-bold text-bark">Line Items</h3>
+              <h3 className="font-display text-lg font-bold text-bark">Lignes du devis</h3>
               <Button variant="primary" size="sm" onClick={addItem}>
                 <Plus size={14} />
-                Add Item
+                Ajouter une ligne
               </Button>
             </div>
 
             {items.length > 0 && (
               <div className="mb-2 grid grid-cols-[24px_1fr_2fr_70px_90px_90px_80px] gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
                 <div />
-                <div>Description</div>
+                <div>Désignation</div>
                 <div>Article</div>
-                <div>Qty</div>
-                <div>Price</div>
+                <div>Qté</div>
+                <div>Prix</div>
                 <div>Total</div>
                 <div />
               </div>
@@ -372,7 +372,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                       value={item.name}
                       onChange={e => updateItem(item.id, { name: e.target.value })}
                       className="w-full rounded border border-sand/60 bg-white px-2 py-1.5 text-xs focus:border-gold-dark focus:outline-none"
-                      placeholder="Description"
+                      placeholder="Désignation"
                     />
 
                     {/* Article dropdown */}
@@ -410,14 +410,14 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                       'text-center text-xs font-semibold',
                       item.isOffered ? 'text-forest' : 'text-bark',
                     )}>
-                      {item.isOffered ? 'Offered' : fmtCurrency(lineTotal)}
+                      {item.isOffered ? 'Offert' : fmtCurrency(lineTotal)}
                     </span>
 
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => updateItem(item.id, { isOffered: !item.isOffered })}
                         className={cn('rounded p-1 transition-colors', item.isOffered ? 'text-forest' : 'text-sand hover:text-muted')}
-                        title={item.isOffered ? 'Remove offer' : 'Mark as offered'}
+                        title={item.isOffered ? 'Retirer l’offre' : 'Marquer comme offert'}
                         aria-label={item.isOffered ? 'Remove offer' : 'Mark as offered'}
                       >
                         <Gift size={14} />
@@ -425,8 +425,8 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
                       <button
                         onClick={() => updateItem(item.id, { hideQty: !item.hideQty })}
                         className={cn('rounded p-1 transition-colors', item.hideQty ? 'text-navy' : 'text-sand hover:text-muted')}
-                        title={item.hideQty ? 'Show qty in PDF' : 'Hide qty in PDF'}
-                        aria-label={item.hideQty ? 'Show qty in PDF' : 'Hide qty in PDF'}
+                        title={item.hideQty ? 'Afficher la qté dans le PDF' : 'Masquer la qté dans le PDF'}
+                        aria-label={item.hideQty ? 'Afficher la qté dans le PDF' : 'Masquer la qté dans le PDF'}
                       >
                         {item.hideQty ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
@@ -460,7 +460,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
 
             <div className="mb-4">
               <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">
-                Discount
+                Remise
               </label>
               <div className="flex gap-2">
                 <div className="flex rounded-lg border border-sand overflow-hidden">
@@ -506,12 +506,12 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
 
             <div className="space-y-2 border-t border-sand/40 pt-4">
               <div className="flex justify-between text-sm">
-                <span className="text-muted">Subtotal</span>
+                <span className="text-muted">Sous-total</span>
                 <span className="font-medium">{fmtCurrency(subtotal)}</span>
               </div>
               {discAmount > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted">Discount</span>
+                  <span className="text-muted">Remise</span>
                   <span className="font-medium text-coral">-{fmtCurrency(discAmount)}</span>
                 </div>
               )}
@@ -526,7 +526,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
             <div className="mt-6">
               <Button variant="primary" className="w-full" onClick={exportAndSave} disabled={saving}>
                 <Download size={16} />
-                {saving ? 'Saving...' : 'Export PDF'}
+                {saving ? 'Enregistrement…' : 'Exporter le PDF'}
               </Button>
             </div>
           </Card>
@@ -534,11 +534,11 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
       </div>
 
       {/* Clear confirmation */}
-      <Modal open={showClearConfirm} onClose={() => setShowClearConfirm(false)} title="Clear this quote?" width="sm">
-        <p className="text-sm text-muted mb-6">This will remove all items, client info, and discount. This cannot be undone.</p>
+      <Modal open={showClearConfirm} onClose={() => setShowClearConfirm(false)} title="Vider ce devis ?" width="sm">
+        <p className="text-sm text-muted mb-6">Cela supprimera tous les articles, les informations client et la remise. Action irréversible.</p>
         <div className="flex gap-3 justify-end">
-          <Button variant="ghost" onClick={() => setShowClearConfirm(false)}>Cancel</Button>
-          <Button variant="primary" onClick={clearQuote} className="bg-coral hover:bg-coral/90">Clear Quote</Button>
+          <Button variant="ghost" onClick={() => setShowClearConfirm(false)}>Annuler</Button>
+          <Button variant="primary" onClick={clearQuote} className="bg-coral hover:bg-coral/90">Vider le devis</Button>
         </div>
       </Modal>
     </div>

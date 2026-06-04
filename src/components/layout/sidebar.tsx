@@ -7,17 +7,17 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/quotes', icon: FileText, label: 'Quotes' },
-  { to: '/projects', icon: FolderKanban, label: 'Projects' },
-  { to: '/finance', icon: Wallet, label: 'Finance' },
-  { to: '/expenses', icon: Receipt, label: 'Expenses' },
+  { to: '/', icon: LayoutDashboard, label: 'Tableau de bord' },
+  { to: '/quotes', icon: FileText, label: 'Devis' },
+  { to: '/projects', icon: FolderKanban, label: 'Projets' },
+  { to: '/finance', icon: Wallet, label: 'Finances' },
+  { to: '/expenses', icon: Receipt, label: 'Dépenses' },
 ]
 
 const secondaryItems = [
-  { to: '/catalog', icon: BookOpen, label: 'Catalog' },
-  { to: '/suppliers', icon: Users, label: 'Suppliers' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/catalog', icon: BookOpen, label: 'Catalogue' },
+  { to: '/suppliers', icon: Users, label: 'Fournisseurs' },
+  { to: '/settings', icon: Settings, label: 'Réglages' },
 ]
 
 export function Sidebar() {
@@ -33,7 +33,7 @@ export function Sidebar() {
         </div>
       </div>
       <nav className="flex-1 px-3 py-2">
-        <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-sand">Main</div>
+        <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-sand">Principal</div>
         {navItems.map(item => (
           <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => cn(
             'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
@@ -43,7 +43,7 @@ export function Sidebar() {
           </NavLink>
         ))}
         <div className="my-4 border-t border-sand/40" />
-        <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-sand">Setup</div>
+        <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-sand">Configuration</div>
         {secondaryItems.map(item => (
           <NavLink key={item.to} to={item.to} className={({ isActive }) => cn(
             'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
@@ -56,7 +56,7 @@ export function Sidebar() {
       <div className="border-t border-sand/40 px-4 py-4">
         <div className="mb-2 truncate text-xs text-muted">{user?.email}</div>
         <button onClick={() => signOut()} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-cream-dark hover:text-bark transition-colors">
-          <LogOut size={14} />Sign out
+          <LogOut size={14} />Déconnexion
         </button>
       </div>
     </aside>

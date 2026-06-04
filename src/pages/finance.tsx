@@ -119,7 +119,7 @@ export function FinancePage() {
 
   return (
     <div>
-      <PageHeader title="Finance" subtitle="Where your money is" />
+      <PageHeader title="Finances" subtitle="Où se trouve votre argent" />
 
       {/* Pipeline Money KPIs */}
       <div className="mb-8 grid grid-cols-3 gap-4">
@@ -129,9 +129,9 @@ export function FinancePage() {
               <FileText size={20} className="text-navy" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted">Quoted</p>
+              <p className="text-xs font-medium text-muted">Devisé</p>
               <p className="font-display text-2xl font-bold text-bark" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(totalQuoted)}</p>
-              <p className="text-[10px] text-muted">{quotedCount} project{quotedCount !== 1 ? 's' : ''} waiting for response</p>
+              <p className="text-[10px] text-muted">{quotedCount} projet{quotedCount !== 1 ? 's' : ''} en attente de réponse</p>
             </div>
           </div>
         </Card>
@@ -142,9 +142,9 @@ export function FinancePage() {
               <Hammer size={20} className="text-navy" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted">In the Works</p>
+              <p className="text-xs font-medium text-muted">En production</p>
               <p className="font-display text-2xl font-bold text-bark" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(totalInProgress)}</p>
-              <p className="text-[10px] text-muted">{inProgressCount} project{inProgressCount !== 1 ? 's' : ''} being produced</p>
+              <p className="text-[10px] text-muted">{inProgressCount} projet{inProgressCount !== 1 ? 's' : ''} en cours de production</p>
             </div>
           </div>
         </Card>
@@ -155,13 +155,13 @@ export function FinancePage() {
               <Wallet size={20} className="text-forest" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted">In My Pocket</p>
+              <p className="text-xs font-medium text-muted">Dans ma poche</p>
               <p className="font-display text-2xl font-bold text-forest" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(totalCollected)}</p>
               <p className="text-[10px] text-muted">
                 {totalExpensesAmt > 0 ? (
-                  <>after expenses: <span className={netProfit >= 0 ? 'text-forest' : 'text-coral'}>{fmtCurrency(netProfit)}</span></>
+                  <>après dépenses : <span className={netProfit >= 0 ? 'text-forest' : 'text-coral'}>{fmtCurrency(netProfit)}</span></>
                 ) : (
-                  'total payments collected'
+                  'total des paiements encaissés'
                 )}
               </p>
             </div>
@@ -173,7 +173,7 @@ export function FinancePage() {
         {/* Monthly breakdown */}
         <div className="col-span-2">
           <Card>
-            <CardTitle>Monthly Breakdown</CardTitle>
+            <CardTitle>Détail mensuel</CardTitle>
             <div className="mt-4 space-y-1">
               {monthlyData.map(m => (
                 <div key={m.month}>
@@ -221,7 +221,7 @@ export function FinancePage() {
               ))}
 
               {monthlyData.length === 0 && (
-                <p className="py-8 text-center text-sm text-muted">No financial data yet</p>
+                <p className="py-8 text-center text-sm text-muted">Aucune donnée financière pour le moment</p>
               )}
             </div>
           </Card>
@@ -230,7 +230,7 @@ export function FinancePage() {
         {/* Payment methods + Sumit */}
         <div>
           <Card>
-            <CardTitle>By Payment Method</CardTitle>
+            <CardTitle>Par méthode de paiement</CardTitle>
             <div className="mt-4 space-y-3">
               {methodBreakdown.map(([method, amount]) => {
                 const pct = totalCollected > 0 ? (amount / totalCollected) * 100 : 0
@@ -252,14 +252,14 @@ export function FinancePage() {
               })}
 
               {methodBreakdown.length === 0 && (
-                <p className="py-4 text-center text-xs text-muted">No payments yet</p>
+                <p className="py-4 text-center text-xs text-muted">Aucun paiement pour le moment</p>
               )}
             </div>
           </Card>
 
           {/* Sumit tracker */}
           <Card className="mt-6">
-            <CardTitle>Sumit Tracker</CardTitle>
+            <CardTitle>Suivi Sumit</CardTitle>
             <div className="mt-4 space-y-2">
               {projects.filter(p => !p.sumit_done).slice(0, 5).map(p => (
                 <div key={p.id} className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-cream transition-colors">
@@ -267,19 +267,19 @@ export function FinancePage() {
                   <button
                     onClick={async () => {
                       const { error } = await supabase.from('projects').update({ sumit_done: true }).eq('id', p.id)
-                      if (error) { toast('Failed: ' + error.message, 'error'); return }
+                      if (error) { toast('Échec : ' + error.message, 'error'); return }
                       setProjects(prev => prev.map(x => x.id === p.id ? { ...x, sumit_done: true } : x))
-                      toast('Marked as done in Sumit')
+                      toast('Marqué comme fait dans Sumit')
                     }}
                     className="rounded-lg bg-forest-bg px-2 py-1 text-[10px] font-medium text-forest hover:bg-forest-dot/30 transition-colors"
                   >
                     <CheckCircle size={12} className="inline mr-1" />
-                    Mark done
+                    Marquer fait
                   </button>
                 </div>
               ))}
               {projects.filter(p => !p.sumit_done).length === 0 && (
-                <p className="py-4 text-center text-xs text-muted">All projects logged in Sumit</p>
+                <p className="py-4 text-center text-xs text-muted">Tous les projets sont enregistrés dans Sumit</p>
               )}
             </div>
           </Card>

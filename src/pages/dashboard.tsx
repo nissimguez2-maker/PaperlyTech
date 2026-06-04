@@ -59,7 +59,7 @@ export function DashboardPage() {
     }))
     const { error } = await supabase.from('tasks').update({ completed: true }).eq('id', id)
     if (error) {
-      toast('Failed to update task', 'error')
+      toast('Échec de la mise à jour de la tâche', 'error')
       setData(prev => ({
         ...prev,
         tasks: prev.tasks.map(t => t.id === id ? { ...t, completed: false } : t),
@@ -75,13 +75,13 @@ export function DashboardPage() {
       priority: 'medium',
     }).select('*').single()
     if (error || !saved) {
-      toast('Failed to add task', 'error')
+      toast('Échec de l’ajout de la tâche', 'error')
       return
     }
     setData(prev => ({ ...prev, tasks: [saved as Task, ...prev.tasks] }))
     setQuickTaskTitle('')
     setShowQuickTask(false)
-    toast('Task added')
+    toast('Tâche ajoutée')
   }, [quickTaskTitle, toast])
 
   const activeProjects = data.projects.filter(p => p.pipeline_stage !== 'delivered')
@@ -121,13 +121,13 @@ export function DashboardPage() {
   return (
     <div>
       <PageHeader
-        title="Dashboard"
-        subtitle="Overview of your studio"
+        title="Tableau de bord"
+        subtitle="Vue d’ensemble de votre studio"
         actions={
           <Link to="/quotes">
             <Button variant="primary">
               <Plus size={16} />
-              New Quote
+              Nouveau devis
             </Button>
           </Link>
         }
@@ -141,7 +141,7 @@ export function DashboardPage() {
               <TrendingUp size={20} className="text-forest" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted">Revenue (this month)</p>
+              <p className="text-xs font-medium text-muted">Revenus (ce mois)</p>
               <p className="font-display text-2xl font-bold text-bark" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(thisMonthRevenue)}</p>
             </div>
           </div>
@@ -153,7 +153,7 @@ export function DashboardPage() {
               <TrendingDown size={20} className="text-coral" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted">Expenses (this month)</p>
+              <p className="text-xs font-medium text-muted">Dépenses (ce mois)</p>
               <p className="font-display text-2xl font-bold text-bark" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(thisMonthExpenses)}</p>
             </div>
           </div>
@@ -165,7 +165,7 @@ export function DashboardPage() {
               <DollarSign size={20} className={thisMonthNet >= 0 ? 'text-forest' : 'text-coral'} />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted">Net (this month)</p>
+              <p className="text-xs font-medium text-muted">Net (ce mois)</p>
               <p className={cn('font-display text-2xl font-bold', thisMonthNet >= 0 ? 'text-forest' : 'text-coral')} style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {thisMonthNet >= 0 ? '+' : ''}{fmtCurrency(thisMonthNet)}
               </p>
@@ -179,7 +179,7 @@ export function DashboardPage() {
               <Clock size={20} className="text-navy" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted">Active Projects</p>
+              <p className="text-xs font-medium text-muted">Projets actifs</p>
               <p className="font-display text-2xl font-bold text-bark">{activeProjects.length}</p>
             </div>
           </div>
@@ -191,7 +191,7 @@ export function DashboardPage() {
               <AlertCircle size={20} className={overdueProjects.length > 0 ? 'text-coral' : 'text-forest'} />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted">Overdue</p>
+              <p className="text-xs font-medium text-muted">En retard</p>
               <p className="font-display text-2xl font-bold text-bark">{overdueProjects.length}</p>
             </div>
           </div>
@@ -205,14 +205,14 @@ export function DashboardPage() {
           {/* Next Deliveries */}
           <Card>
             <div className="mb-4 flex items-center justify-between">
-              <CardTitle>Next Deliveries</CardTitle>
+              <CardTitle>Prochaines livraisons</CardTitle>
               <Link to="/projects" className="flex items-center gap-1 text-xs font-medium text-gold-dark hover:underline">
-                View all <ArrowRight size={12} />
+                Tout voir <ArrowRight size={12} />
               </Link>
             </div>
 
             {nextDeliveries.length === 0 ? (
-              <p className="py-4 text-center text-sm text-muted">No upcoming deliveries</p>
+              <p className="py-4 text-center text-sm text-muted">Aucune livraison à venir</p>
             ) : (
               <div className="space-y-3">
                 {nextDeliveries.map(p => {
@@ -244,7 +244,7 @@ export function DashboardPage() {
                             'text-[10px] font-medium',
                             daysLeft <= 3 ? 'text-coral' : daysLeft <= 7 ? 'text-gold-dark' : 'text-muted',
                           )}>
-                            {daysLeft === 0 ? 'Today' : daysLeft === 1 ? 'Tomorrow' : daysLeft + ' days left'}
+                            {daysLeft === 0 ? 'Aujourd’hui' : daysLeft === 1 ? 'Demain' : 'J-' + daysLeft}
                           </p>
                         </div>
                         <PipelineBadge stage={p.pipeline_stage} />
@@ -259,9 +259,9 @@ export function DashboardPage() {
           {/* Active projects */}
           <Card>
             <div className="mb-4 flex items-center justify-between">
-              <CardTitle>Active Projects</CardTitle>
+              <CardTitle>Projets actifs</CardTitle>
               <Link to="/projects" className="flex items-center gap-1 text-xs font-medium text-gold-dark hover:underline">
-                View all <ArrowRight size={12} />
+                Tout voir <ArrowRight size={12} />
               </Link>
             </div>
 
@@ -291,7 +291,7 @@ export function DashboardPage() {
               ))}
 
               {activeProjects.length === 0 && (
-                <p className="py-8 text-center text-sm text-muted">No active projects</p>
+                <p className="py-8 text-center text-sm text-muted">Aucun projet actif</p>
               )}
             </div>
           </Card>
@@ -302,16 +302,16 @@ export function DashboardPage() {
           {/* Pending tasks - INTERACTIVE */}
           <Card>
             <div className="mb-4 flex items-center justify-between">
-              <CardTitle>To Do</CardTitle>
+              <CardTitle>À faire</CardTitle>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setShowQuickTask(!showQuickTask)}
                   className="flex items-center gap-1 text-xs font-medium text-gold-dark hover:underline"
                 >
-                  <Plus size={12} /> Add
+                  <Plus size={12} /> Ajouter
                 </button>
                 <Link to="/projects" className="flex items-center gap-1 text-xs font-medium text-gold-dark hover:underline">
-                  View all <ArrowRight size={12} />
+                  Tout voir <ArrowRight size={12} />
                 </Link>
               </div>
             </div>
@@ -322,11 +322,11 @@ export function DashboardPage() {
                   value={quickTaskTitle}
                   onChange={e => setQuickTaskTitle(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') addQuickTask(); if (e.key === 'Escape') setShowQuickTask(false) }}
-                  placeholder="Quick task..."
+                  placeholder="Tâche rapide..."
                   className="flex-1 rounded-lg border border-sand bg-white px-3 py-2 text-sm focus:border-gold-dark focus:outline-none"
                   autoFocus
                 />
-                <Button variant="primary" size="sm" onClick={addQuickTask}>Add</Button>
+                <Button variant="primary" size="sm" onClick={addQuickTask}>Ajouter</Button>
               </div>
             )}
 
@@ -341,7 +341,7 @@ export function DashboardPage() {
                     <button
                       onClick={() => toggleTask(t.id)}
                       className="text-sand hover:text-forest transition-colors"
-                      aria-label="Mark complete"
+                      aria-label="Marquer comme terminé"
                     >
                       <Circle size={18} />
                     </button>
@@ -361,7 +361,7 @@ export function DashboardPage() {
               })}
 
               {pendingTasks.length === 0 && (
-                <p className="py-4 text-center text-sm text-muted">All caught up!</p>
+                <p className="py-4 text-center text-sm text-muted">Tout est à jour !</p>
               )}
             </div>
           </Card>
@@ -369,9 +369,9 @@ export function DashboardPage() {
           {/* Recent payments — with project/client name */}
           <Card>
             <div className="mb-4 flex items-center justify-between">
-              <CardTitle>Recent Payments</CardTitle>
+              <CardTitle>Paiements récents</CardTitle>
               <Link to="/finance" className="flex items-center gap-1 text-xs font-medium text-gold-dark hover:underline">
-                View all <ArrowRight size={12} />
+                Tout voir <ArrowRight size={12} />
               </Link>
             </div>
 
@@ -392,7 +392,7 @@ export function DashboardPage() {
               ))}
 
               {recentPayments.length === 0 && (
-                <p className="py-4 text-center text-sm text-muted">No payments yet</p>
+                <p className="py-4 text-center text-sm text-muted">Aucun paiement pour le moment</p>
               )}
             </div>
           </Card>

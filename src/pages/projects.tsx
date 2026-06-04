@@ -78,7 +78,7 @@ export function ProjectsPage() {
     ))
     const { error } = await supabase.from('projects').update({ pipeline_stage: newStage }).eq('id', projectId)
     if (error) {
-      toast('Failed to update stage: ' + error.message, 'error')
+      toast('Échec du changement d’étape : ' + error.message, 'error')
       if (previousStage) {
         setProjects(prev => prev.map(p =>
           p.id === projectId ? { ...p, pipeline_stage: previousStage } : p
@@ -107,13 +107,13 @@ export function ProjectsPage() {
             priority: 'medium' as const,
           }))
           await supabase.from('tasks').insert(taskInserts)
-          toast(taskInserts.length + ' tasks created')
+          toast(taskInserts.length + ' tâche' + (taskInserts.length > 1 ? 's' : '') + ' créée' + (taskInserts.length > 1 ? 's' : ''))
           await loadProjects()
         }
       }
     }
 
-    toast('Stage changed to ' + PIPELINE_STAGES[newStage].label)
+    toast('Étape changée en ' + PIPELINE_STAGES[newStage].label)
   }, [projects, toast, loadProjects])
 
   const deleteProject = useCallback(async (projectId: string) => {
@@ -129,12 +129,12 @@ export function ProjectsPage() {
     const { error } = await supabase.from('projects').delete().eq('id', projectId)
 
     if (error) {
-      toast('Failed to delete project: ' + error.message, 'error')
+      toast('Échec de la suppression du projet : ' + error.message, 'error')
       return
     }
     setProjects(prev => prev.filter(p => p.id !== projectId))
     setDeletingId(null)
-    toast('Project deleted')
+    toast('Projet supprimé')
   }, [toast])
 
   const toggleTask = useCallback(async (taskId: string) => {
@@ -147,7 +147,7 @@ export function ProjectsPage() {
       }),
     })))
     const { error } = await supabase.from('tasks').update({ completed: newCompleted }).eq('id', taskId)
-    if (error) toast('Failed to update task', 'error')
+    if (error) toast('Échec de la mise à jour de la tâche', 'error')
   }, [toast])
 
   const deleteTask = useCallback(async (taskId: string) => {
@@ -156,8 +156,8 @@ export function ProjectsPage() {
       tasks: p.tasks.filter(t => t.id !== taskId),
     })))
     const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-    if (error) toast('Failed to delete task', 'error')
-    else toast('Task deleted')
+    if (error) toast('Échec de la suppression de la tâche', 'error')
+    else toast('Tâche supprimée')
   }, [toast])
 
   const filtered = useMemo(() => {
@@ -194,11 +194,11 @@ export function ProjectsPage() {
   return (
     <div>
       <PageHeader
-        title="Projects"
-        subtitle={projects.length + ' projects total'}
+        title="Projets"
+        subtitle={projects.length + ' projet' + (projects.length !== 1 ? 's' : '') + ' au total'}
         actions={
           <Link to="/quotes">
-            <Button variant="primary"><Plus size={16} /> New Quote</Button>
+            <Button variant="primary"><Plus size={16} /> Nouveau devis</Button>
           </Link>
         }
       />
@@ -209,7 +209,7 @@ export function ProjectsPage() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search projects or clients..."
+            placeholder="Rechercher un projet ou un client..."
             className="w-full rounded-xl border border-sand bg-white py-2.5 pl-10 pr-4 text-sm focus:border-gold-dark focus:outline-none"
           />
         </div>
@@ -221,7 +221,7 @@ export function ProjectsPage() {
               stageFilter === 'all' ? 'bg-gold-dark text-white' : 'text-muted hover:bg-cream',
             )}
           >
-            All
+            Tous
           </button>
           {STAGES.map(stage => (
             <button
@@ -241,9 +241,9 @@ export function ProjectsPage() {
       {filtered.length === 0 ? (
         <EmptyState
           icon={Filter}
-          title="No projects found"
-          description={search ? 'Try a different search term' : 'Create your first quote to get started'}
-          action={!search ? { label: 'New Quote', onClick: () => navigate('/quotes') } : undefined}
+          title="Aucun projet trouvé"
+          description={search ? 'Essayez un autre terme de recherche' : 'Créez votre premier devis pour commencer'}
+          action={!search ? { label: 'Nouveau devis', onClick: () => navigate('/quotes') } : undefined}
         />
       ) : groupedByStage ? (
         <div className="space-y-8">
@@ -302,15 +302,15 @@ export function ProjectsPage() {
           <div className="fixed inset-0 z-40 bg-bark/30 backdrop-blur-sm" onClick={() => setDeletingId(null)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="w-full max-w-sm rounded-2xl border border-sand bg-white p-6 shadow-xl">
-              <h3 className="mb-2 text-lg font-semibold text-bark">Delete Project</h3>
+              <h3 className="mb-2 text-lg font-semibold text-bark">Supprimer le projet</h3>
               <p className="mb-1 text-sm text-muted">
-                This will permanently delete this project and all associated data:
+                Cette action supprimera définitivement ce projet et toutes les données associées :
               </p>
-              <p className="mb-4 text-xs text-muted">quotes, line items, tasks, and payments.</p>
+              <p className="mb-4 text-xs text-muted">devis, lignes, tâches et paiements.</p>
               <div className="flex gap-2 justify-end">
-                <Button variant="ghost" size="sm" onClick={() => setDeletingId(null)}>Cancel</Button>
+                <Button variant="ghost" size="sm" onClick={() => setDeletingId(null)}>Annuler</Button>
                 <Button variant="danger" size="sm" onClick={() => deleteProject(deletingId)}>
-                  <Trash2 size={14} /> Delete
+                  <Trash2 size={14} /> Supprimer
                 </Button>
               </div>
             </div>
@@ -359,7 +359,7 @@ function ProjectCard({ project: p, onChangeStage, onDelete: _onDelete, deletingI
         <div className="flex items-center gap-6">
           {p.tasks.length > 0 && (
             <span className="text-[10px] text-muted whitespace-nowrap">
-              {completedTasks.length}/{p.tasks.length} done
+              {completedTasks.length}/{p.tasks.length} faites
             </span>
           )}
 
@@ -422,7 +422,7 @@ function ProjectCard({ project: p, onChangeStage, onDelete: _onDelete, deletingI
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeletingId(p.id) }}
             className="text-sand hover:text-coral transition-colors"
-            aria-label="Delete project"
+            aria-label="Supprimer le projet"
           >
             <Trash2 size={15} />
           </button>

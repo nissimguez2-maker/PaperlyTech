@@ -20,13 +20,13 @@ export function LoginPage() {
     try {
       if (mode === 'login') {
         await signIn(email, password)
-        toast('Welcome back!')
+        toast('Bon retour !')
       } else {
         await signUp(email, password, name)
-        toast('Account created! Check your email.')
+        toast('Compte créé ! Vérifiez vos e-mails.')
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Something went wrong'
+      const message = err instanceof Error ? err.message : 'Une erreur est survenue'
       toast(message, 'error')
     } finally {
       setLoading(false)
@@ -42,19 +42,19 @@ export function LoginPage() {
             P
           </div>
           <h1 className="font-display text-3xl font-bold text-bark">Paperly</h1>
-          <p className="mt-1 text-sm text-muted">Creative direction studio</p>
+          <p className="mt-1 text-sm text-muted">Studio de direction créative</p>
         </div>
 
         {/* Form */}
         <div className="rounded-2xl border border-sand/60 bg-white p-7 shadow-sm">
           <h2 className="mb-5 font-display text-xl font-bold text-bark">
-            {mode === 'login' ? 'Sign in' : 'Create account'}
+            {mode === 'login' ? 'Connexion' : 'Créer un compte'}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <Input
-                label="Full Name"
+                label="Nom complet"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="Sacha Guez"
@@ -62,15 +62,15 @@ export function LoginPage() {
               />
             )}
             <Input
-              label="Email"
+              label="E-mail"
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="you@paperly.com"
+              placeholder="vous@paperly.com"
               required
             />
             <Input
-              label="Password"
+              label="Mot de passe"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -79,7 +79,7 @@ export function LoginPage() {
               minLength={6}
             />
             <Button variant="primary" className="w-full" type="submit" disabled={loading}>
-              {loading ? 'Loading...' : mode === 'login' ? 'Sign in' : 'Create account'}
+              {loading ? 'Chargement...' : mode === 'login' ? 'Connexion' : 'Créer un compte'}
             </Button>
           </form>
 
@@ -88,7 +88,7 @@ export function LoginPage() {
               onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
               className="text-xs text-muted hover:text-gold-dark transition-colors"
             >
-              {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+              {mode === 'login' ? "Pas encore de compte ? Inscrivez-vous" : 'Déjà un compte ? Connectez-vous'}
             </button>
           </div>
         </div>

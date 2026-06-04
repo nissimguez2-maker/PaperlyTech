@@ -38,7 +38,7 @@ function ProtectedRoutes() {
       <div className="flex h-screen items-center justify-center bg-cream">
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-gold-dark border-t-transparent" />
-          <p className="text-sm text-muted">Loading Paperly...</p>
+          <p className="text-sm text-muted">Chargement de Paperly...</p>
         </div>
       </div>
     )

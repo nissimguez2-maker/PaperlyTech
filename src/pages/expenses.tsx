@@ -13,13 +13,13 @@ import { supabase } from '@/lib/supabase'
 import type { Expense } from '@/types/database'
 
 const EXPENSE_CATEGORIES = [
-  { value: 'materials', label: 'Materials' },
-  { value: 'printing', label: 'Printing' },
-  { value: 'shipping', label: 'Shipping' },
-  { value: 'tools', label: 'Tools & Equipment' },
-  { value: 'software', label: 'Software' },
+  { value: 'materials', label: 'Matériaux' },
+  { value: 'printing', label: 'Impression' },
+  { value: 'shipping', label: 'Livraison' },
+  { value: 'tools', label: 'Outils & équipement' },
+  { value: 'software', label: 'Logiciels' },
   { value: 'marketing', label: 'Marketing' },
-  { value: 'other', label: 'Other' },
+  { value: 'other', label: 'Autre' },
 ]
 
 export function ExpensesPage() {
@@ -50,7 +50,7 @@ export function ExpensesPage() {
 
   const addExpense = useCallback(async () => {
     if (!form.description.trim() || !form.amount) {
-      toast('Fill in all fields', 'error')
+      toast('Remplissez tous les champs', 'error')
       return
     }
 
@@ -62,24 +62,24 @@ export function ExpensesPage() {
     }).select('*').single()
 
     if (error || !saved) {
-      toast('Failed to add expense: ' + (error?.message ?? 'unknown'), 'error')
+      toast('Échec de l’ajout de la dépense : ' + (error?.message ?? 'inconnu'), 'error')
       return
     }
 
     setExpenses(prev => [saved as Expense, ...prev])
     setShowAdd(false)
     setForm({ date: new Date().toISOString().slice(0, 10), description: '', amount: '', category: 'materials' })
-    toast('Expense added')
+    toast('Dépense ajoutée')
   }, [form, toast])
 
   const deleteExpense = useCallback(async (id: string) => {
     setExpenses(prev => prev.filter(e => e.id !== id))
     const { error } = await supabase.from('expenses').delete().eq('id', id)
     if (error) {
-      toast('Failed to delete: ' + error.message, 'error')
+      toast('Échec de la suppression : ' + error.message, 'error')
       return
     }
-    toast('Expense deleted')
+    toast('Dépense supprimée')
   }, [toast])
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0)
@@ -95,11 +95,11 @@ export function ExpensesPage() {
   return (
     <div>
       <PageHeader
-        title="Expenses"
-        subtitle={`Total: ${fmtCurrency(totalExpenses)}`}
+        title="Dépenses"
+        subtitle={`Total : ${fmtCurrency(totalExpenses)}`}
         actions={
           <Button variant="primary" onClick={() => setShowAdd(true)}>
-            <Plus size={16} /> Add Expense
+            <Plus size={16} /> Ajouter une dépense
           </Button>
         }
       />
@@ -107,17 +107,17 @@ export function ExpensesPage() {
       {expenses.length === 0 ? (
         <EmptyState
           icon={Receipt}
-          title="No expenses yet"
-          description="Track your business expenses to see profitability"
-          action={{ label: 'Add Expense', onClick: () => setShowAdd(true) }}
+          title="Aucune dépense"
+          description="Suivez vos dépenses professionnelles pour visualiser votre rentabilité"
+          action={{ label: 'Ajouter une dépense', onClick: () => setShowAdd(true) }}
         />
       ) : (
         <Card>
           <div className="mb-3 grid grid-cols-[110px_1fr_120px_100px_40px] gap-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted">
             <div>Date</div>
             <div>Description</div>
-            <div>Category</div>
-            <div className="text-right">Amount</div>
+            <div>Catégorie</div>
+            <div className="text-right">Montant</div>
             <div />
           </div>
 
@@ -129,12 +129,12 @@ export function ExpensesPage() {
               >
                 <span className="text-xs text-muted">{fmtDate(e.date)}</span>
                 <span className="text-sm text-bark">{e.description}</span>
-                <span className="text-xs text-muted capitalize">{e.category}</span>
+                <span className="text-xs text-muted">{EXPENSE_CATEGORIES.find(c => c.value === e.category)?.label ?? e.category}</span>
                 <span className="text-right text-sm font-semibold text-coral">{fmtCurrency(e.amount)}</span>
                 <button
                   onClick={() => deleteExpense(e.id)}
                   className="opacity-0 group-hover:opacity-100 text-sand hover:text-coral transition-all"
-                  aria-label="Delete expense"
+                  aria-label="Supprimer la dépense"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -145,7 +145,7 @@ export function ExpensesPage() {
       )}
 
       {/* Add expense modal */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Expense" width="sm">
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Ajouter une dépense" width="sm">
         <div className="space-y-4">
           <Input
             label="Date"
@@ -157,24 +157,24 @@ export function ExpensesPage() {
             label="Description"
             value={form.description}
             onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-            placeholder="What was this expense for?"
+            placeholder="À quoi correspond cette dépense ?"
           />
           <Input
-            label="Amount (NIS )"
+            label="Montant (₪)"
             type="number"
             value={form.amount}
             onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
             placeholder="0"
           />
           <Select
-            label="Category"
+            label="Catégorie"
             value={form.category}
             onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
             options={EXPENSE_CATEGORIES}
           />
           <div className="flex gap-3 justify-end pt-2">
-            <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
-            <Button variant="primary" onClick={addExpense}>Add Expense</Button>
+            <Button variant="ghost" onClick={() => setShowAdd(false)}>Annuler</Button>
+            <Button variant="primary" onClick={addExpense}>Ajouter</Button>
           </div>
         </div>
       </Modal>
