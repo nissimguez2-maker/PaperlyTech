@@ -1,16 +1,12 @@
-import { cn } from '@/lib/utils'
+import { cn, PIPELINE_STAGES } from '@/lib/utils'
 import type { PipelineStage } from '@/types/database'
 
 const stageStyles: Record<string, { bg: string; text: string; dot: string }> = {
-  quoted: { bg: 'bg-navy-bg', text: 'text-navy', dot: 'bg-navy-dot' },
-  in_progress: { bg: 'bg-navy-bg', text: 'text-navy', dot: 'bg-navy' },
-  delivered: { bg: 'bg-forest-bg', text: 'text-forest', dot: 'bg-forest' },
-}
-
-const stageLabels: Record<string, string> = {
-  quoted: 'Devisé',
-  in_progress: 'En production',
-  delivered: 'Livré',
+  quoted:      { bg: 'bg-navy-bg',    text: 'text-navy',      dot: 'bg-navy-dot' },
+  accepted:    { bg: 'bg-cream-dark', text: 'text-gold-dark', dot: 'bg-gold-dark' },
+  in_progress: { bg: 'bg-navy-bg',    text: 'text-navy',      dot: 'bg-navy' },
+  delivered:   { bg: 'bg-forest-bg',  text: 'text-forest',    dot: 'bg-forest' },
+  paid:        { bg: 'bg-forest-bg',  text: 'text-forest',    dot: 'bg-bark' },
 }
 
 // Repli neutre : tout stage inconnu (donnée héritée, valeur future) reste affichable
@@ -24,7 +20,7 @@ interface BadgeProps {
 
 export function PipelineBadge({ stage, className }: BadgeProps) {
   const s = stageStyles[stage] ?? FALLBACK
-  const label = stageLabels[stage] ?? stage
+  const label = PIPELINE_STAGES[stage as PipelineStage]?.label ?? stage
 
   return (
     <span

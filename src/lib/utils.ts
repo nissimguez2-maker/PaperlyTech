@@ -64,9 +64,18 @@ export const PAYMENT_METHODS = {
   bit: 'Bit',
 } as const
 
-/** Pipeline stage display config */
+/** Pipeline stage display config — cycle de vie à 5 états (migration 002) */
 export const PIPELINE_STAGES = {
-  quoted: { label: 'Devisé', color: 'bg-navy-bg', dot: 'bg-navy-dot' },
-  in_progress: { label: 'En production', color: 'bg-navy-bg', dot: 'bg-navy' },
-  delivered: { label: 'Livré', color: 'bg-forest-bg', dot: 'bg-forest' },
+  quoted:      { label: 'Devisé',        color: 'bg-navy-bg',   dot: 'bg-navy-dot' },
+  accepted:    { label: 'Accepté',       color: 'bg-cream-dark', dot: 'bg-gold-dark' },
+  in_progress: { label: 'En production', color: 'bg-navy-bg',   dot: 'bg-navy' },
+  delivered:   { label: 'Livré',         color: 'bg-forest-bg', dot: 'bg-forest' },
+  paid:        { label: 'Payé',          color: 'bg-forest-bg', dot: 'bg-bark' },
+} as const
+
+/** Étiquettes des types de revenu (migration 005) */
+export const REVENUE_TYPES = {
+  print:    { label: 'Imprimés',         short: 'Impr.' },
+  digital:  { label: 'Numériques',       short: 'Num.' },
+  original: { label: 'Pièces originales', short: 'Orig.' },
 } as const

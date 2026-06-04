@@ -83,7 +83,11 @@ export interface Client {
   updated_at: string
 }
 
-export type PipelineStage = 'quoted' | 'in_progress' | 'delivered'
+export type PipelineStage = 'quoted' | 'accepted' | 'in_progress' | 'delivered' | 'paid'
+
+export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired'
+
+export type RevenueType = 'print' | 'digital' | 'original'
 
 export interface Project {
   id: string
@@ -112,6 +116,12 @@ export interface Quote {
   total: number
   notes: string | null
   exported_at: string | null
+  // Stabilité (migration 003)
+  status: QuoteStatus
+  accepted_at: string | null
+  valid_until: string | null
+  locked: boolean
+  parent_quote_id: string | null
   created_at: string
   // Joined
   items?: QuoteItem[]
@@ -129,6 +139,8 @@ export interface QuoteItem {
   is_offered: boolean
   hide_qty: boolean
   sort_order: number
+  // Snapshot — un même devis peut mélanger print/digital/original (migration 005)
+  revenue_type: RevenueType | null
 }
 
 export type PaymentMethod = 'wire_transfer' | 'cash' | 'bit'
@@ -178,6 +190,8 @@ export interface Article {
   name: string
   price: number
   note: string | null
+  // Défaut hérité par chaque ligne de devis (migration 005)
+  revenue_type: RevenueType | null
 }
 
 export interface Supplier {
