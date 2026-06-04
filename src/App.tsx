@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/layout/app-layout'
 import { LoginPage } from '@/pages/login'
 import { DashboardPage } from '@/pages/dashboard'
 import { QuotesPage } from '@/pages/quotes'
+import { CalculatorPage } from '@/pages/calculator'
 import { ProjectsPage } from '@/pages/projects'
 import { ProjectDetailPage } from '@/pages/project-detail'
 import { FinancePage } from '@/pages/finance'
@@ -49,6 +50,7 @@ function ProtectedRoutes() {
       <Route element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="quotes" element={<QuotesPage categories={categories} articles={articles} />} />
+        <Route path="calculator" element={<CalculatorPage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:id" element={<ProjectDetailPage />} />
         <Route path="finance" element={<FinancePage />} />

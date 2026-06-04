@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, FolderKanban, Wallet,
-  Receipt, BookOpen, Users, LogOut, Settings,
+  Receipt, BookOpen, Users, LogOut, Settings, Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth-context'
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Tableau de bord' },
   { to: '/quotes', icon: FileText, label: 'Devis' },
+  { to: '/calculator', icon: Sparkles, label: 'Pièces uniques' },
   { to: '/projects', icon: FolderKanban, label: 'Projets' },
   { to: '/finance', icon: Wallet, label: 'Finances' },
   { to: '/expenses', icon: Receipt, label: 'Dépenses' },

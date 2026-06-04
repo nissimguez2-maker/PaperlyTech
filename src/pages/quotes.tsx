@@ -11,7 +11,7 @@ import { useToast } from '@/components/ui/toast'
 import { uid, fmtCurrency, safeFloat, cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 // generateQuotePdf est importé dynamiquement à l'export (code-splitting des polices PDF)
-import type { Category, Article } from '@/types/database'
+import type { Category, Article, RevenueType } from '@/types/database'
 
 interface QuoteItemLocal {
   id: string
@@ -22,6 +22,7 @@ interface QuoteItemLocal {
   isOverride: boolean
   isOffered: boolean
   hideQty: boolean
+  revenueType?: RevenueType
 }
 
 interface QuotePageProps {
@@ -60,6 +61,35 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
     }
     loadClients()
   }, [])
+
+  // Préremplissage depuis le Calculateur · pièces uniques
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('paperly:quote-prefill')
+      if (!raw) return
+      localStorage.removeItem('paperly:quote-prefill')
+      const payload = JSON.parse(raw) as {
+        source?: string
+        items?: Array<{ name?: string; unitPrice?: number; quantity?: number; revenueType?: RevenueType }>
+      }
+      if (payload?.source !== 'custom-calculator' || !Array.isArray(payload.items)) return
+      const prefilled: QuoteItemLocal[] = payload.items.map(it => ({
+        id: uid(),
+        name: it.name || 'Pièce unique',
+        articleId: '',
+        qty: it.quantity ?? 1,
+        unitPrice: String(it.unitPrice ?? 0),
+        isOverride: true,
+        isOffered: false,
+        hideQty: true,
+        revenueType: it.revenueType ?? 'original',
+      }))
+      if (prefilled.length > 0) {
+        setItems(prev => [...prev, ...prefilled])
+        toast(prefilled.length + ' pièce' + (prefilled.length > 1 ? 's' : '') + ' ajoutée' + (prefilled.length > 1 ? 's' : '') + ' au devis')
+      }
+    } catch { /* ignore */ }
+  }, [toast])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -241,7 +271,7 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
           is_offered: it.isOffered,
           hide_qty: it.hideQty,
           sort_order: idx,
-          revenue_type: art?.revenue_type ?? null,
+          revenue_type: it.revenueType ?? art?.revenue_type ?? null,
         }
       })
       const { error: itemsErr } = await supabase.from('quote_items').insert(quoteItems)

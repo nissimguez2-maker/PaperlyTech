@@ -47,6 +47,11 @@ export function safeFloat(val: string | number | null | undefined, fallback = 0)
   return isNaN(n) ? fallback : n
 }
 
+/** Round to 2 decimals (money hand-off) */
+export function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
 /** Clamp a number between min and max */
 export function clamp(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), max)
