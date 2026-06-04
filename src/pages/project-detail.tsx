@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
-  ArrowLeft, Plus, Trash2, Gift, Save, CreditCard,
+  ArrowLeft, Plus, Trash2, Gift, Save, CreditCard, Lock, CheckCircle, Calendar,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardTitle } from '@/components/ui/card'
@@ -34,6 +34,7 @@ export function ProjectDetailPage() {
   const [items, setItems] = useState<ItemLocal[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [pendingDeleteItemId, setPendingDeleteItemId] = useState<string | null>(null)
+  const [pendingAccept, setPendingAccept] = useState(false)
 
   const [payAmount, setPayAmount] = useState('')
   const [payMethod, setPayMethod] = useState<PaymentMethod>('wire_transfer')
@@ -99,15 +100,23 @@ export function ProjectDetailPage() {
     it.isOffered ? sum : sum + it.quantity * it.unitPrice, 0)
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0)
   const remaining = Math.max(0, quoteTotal - totalPaid)
+  const isLocked = quote?.locked ?? false
+  const isFullyPaid = quoteTotal > 0 && totalPaid >= quoteTotal
 
   const syncQuoteTotal = useCallback(async (newItems: ItemLocal[]) => {
-    if (!quote) return
-    const newTotal = newItems.reduce((sum, it) =>
+    if (!quote || quote.locked) return
+    const newSubtotal = newItems.reduce((sum, it) =>
       it.isOffered ? sum : sum + it.quantity * it.unitPrice, 0)
-    await supabase.from('quotes').update({ total: newTotal, subtotal: newTotal }).eq('id', quote.id)
+    // Relire la remise du devis pour ne plus l'écraser (cf. audit C3)
+    const discAmount = quote.discount_mode === 'pct'
+      ? newSubtotal * (quote.discount_value ?? 0) / 100
+      : (quote.discount_value ?? 0)
+    const newTotal = Math.max(0, newSubtotal - discAmount)
+    await supabase.from('quotes').update({ subtotal: newSubtotal, total: newTotal }).eq('id', quote.id)
   }, [quote])
 
   const updateItemField = useCallback(async (itemId: string, field: keyof ItemLocal, value: string | number | boolean) => {
+    if (isLocked) return
     const newItems = items.map(it =>
       it.id === itemId ? { ...it, [field]: value } : it
     )
@@ -129,7 +138,7 @@ export function ProjectDetailPage() {
   }, [items, syncQuoteTotal])
 
   const addItem = useCallback(async () => {
-    if (!quote) return
+    if (!quote || quote.locked) return
     const { data } = await supabase.from('quote_items').insert({
       quote_id: quote.id,
       name: 'Nouvel article',
@@ -156,11 +165,12 @@ export function ProjectDetailPage() {
   }, [quote, items, syncQuoteTotal])
 
   const removeItem = useCallback(async (itemId: string) => {
+    if (isLocked) return
     const newItems = items.filter(it => it.id !== itemId)
     setItems(newItems)
     await supabase.from('quote_items').delete().eq('id', itemId)
     await syncQuoteTotal(newItems)
-  }, [items, syncQuoteTotal])
+  }, [items, syncQuoteTotal, isLocked])
 
   const changeStage = useCallback(async (stage: PipelineStage) => {
     if (!project) return
@@ -191,7 +201,43 @@ export function ProjectDetailPage() {
     }
 
     toast('Étape changée en ' + PIPELINE_STAGES[stage].label)
-  }, [project, items, remaining, toast])
+  }, [project, items, toast])
+
+  // Marquer accepté → fige le prix (verrou) + horodate l'acceptation
+  // (cf. décisions Phase 3 : Accepté = point de bascule du verrou)
+  const markAccepted = useCallback(async () => {
+    if (!project || !quote) return
+    const acceptedAt = new Date().toISOString()
+    const { error: qErr } = await supabase
+      .from('quotes')
+      .update({ status: 'accepted', locked: true, accepted_at: acceptedAt })
+      .eq('id', quote.id)
+    if (qErr) { toast('Échec du verrouillage : ' + qErr.message, 'error'); return }
+    const { error: pErr } = await supabase
+      .from('projects')
+      .update({ pipeline_stage: 'accepted' })
+      .eq('id', project.id)
+    if (pErr) { toast('Échec du changement d’étape : ' + pErr.message, 'error'); return }
+    setQuote({ ...quote, status: 'accepted', locked: true, accepted_at: acceptedAt })
+    setProject({ ...project, pipeline_stage: 'accepted' })
+    setPendingAccept(false)
+    toast('Devis accepté · prix verrouillé')
+  }, [project, quote, toast])
+
+  // Marquer payé : raccourci quand le solde est nul
+  const markPaid = useCallback(async () => {
+    if (!project) return
+    setProject({ ...project, pipeline_stage: 'paid' })
+    const { error } = await supabase
+      .from('projects')
+      .update({ pipeline_stage: 'paid' })
+      .eq('id', project.id)
+    if (error) {
+      toast('Échec du changement d’étape : ' + error.message, 'error')
+      return
+    }
+    toast('Projet marqué comme payé')
+  }, [project, toast])
 
   const addPayment = useCallback(async () => {
     if (!project || !payAmount) return
@@ -263,14 +309,37 @@ export function ProjectDetailPage() {
         }
       />
 
+      {/* Bandeaux d'état : devis verrouillé / solde réglé */}
+      {(isLocked || isFullyPaid) && (
+        <div className="mb-6 flex flex-wrap gap-3">
+          {isLocked && (
+            <div className="inline-flex items-center gap-2 rounded-full bg-cream-dark px-3 py-1.5 text-xs font-medium text-gold-dark">
+              <Lock size={12} />
+              Devis verrouillé{quote?.accepted_at ? ' · accepté le ' + fmtDate(quote.accepted_at.slice(0, 10)) : ''}
+            </div>
+          )}
+          {isFullyPaid && project.pipeline_stage !== 'paid' && (
+            <button
+              onClick={markPaid}
+              className="inline-flex items-center gap-2 rounded-full bg-forest-bg px-3 py-1.5 text-xs font-medium text-forest hover:bg-forest-bg/70 transition-colors"
+            >
+              <CheckCircle size={12} />
+              Solde réglé — marquer comme payé
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-6">
         <div className="col-span-2 space-y-6">
           <Card>
             <div className="mb-4 flex items-center justify-between">
               <CardTitle>Articles</CardTitle>
-              <Button variant="primary" size="sm" onClick={addItem}>
-                <Plus size={14} /> Ajouter un article
-              </Button>
+              {!isLocked && (
+                <Button variant="primary" size="sm" onClick={addItem}>
+                  <Plus size={14} /> Ajouter un article
+                </Button>
+              )}
             </div>
 
             {items.length === 0 ? (
@@ -290,39 +359,55 @@ export function ProjectDetailPage() {
                     <input
                       value={item.name}
                       onChange={e => updateItemField(item.id, 'name', e.target.value)}
-                      className="rounded border border-transparent bg-transparent px-2 py-1 text-sm text-bark hover:border-sand focus:border-gold-dark focus:outline-none"
+                      readOnly={isLocked}
+                      className={cn(
+                        'rounded border border-transparent bg-transparent px-2 py-1 text-sm text-bark focus:outline-none',
+                        isLocked ? 'cursor-not-allowed' : 'hover:border-sand focus:border-gold-dark',
+                      )}
                     />
                     <input
                       type="number"
                       min={1}
                       value={item.quantity}
                       onChange={e => updateItemField(item.id, 'quantity', safeFloat(e.target.value, 1))}
-                      className="rounded border border-transparent bg-transparent px-2 py-1 text-center text-sm text-bark hover:border-sand focus:border-gold-dark focus:outline-none"
+                      readOnly={isLocked}
+                      className={cn(
+                        'rounded border border-transparent bg-transparent px-2 py-1 text-center text-sm text-bark focus:outline-none',
+                        isLocked ? 'cursor-not-allowed' : 'hover:border-sand focus:border-gold-dark',
+                      )}
                     />
                     <input
                       type="number"
                       step="0.01"
                       value={item.unitPrice}
                       onChange={e => updateItemField(item.id, 'unitPrice', safeFloat(e.target.value))}
-                      className="rounded border border-transparent bg-transparent px-2 py-1 text-center text-sm text-bark hover:border-sand focus:border-gold-dark focus:outline-none"
+                      readOnly={isLocked}
+                      className={cn(
+                        'rounded border border-transparent bg-transparent px-2 py-1 text-center text-sm text-bark focus:outline-none',
+                        isLocked ? 'cursor-not-allowed' : 'hover:border-sand focus:border-gold-dark',
+                      )}
                     />
                     <span className={cn('text-center text-sm font-semibold', item.isOffered ? 'text-forest' : 'text-bark')}>
                       {item.isOffered ? 'Offert' : fmtCurrency(item.quantity * item.unitPrice)}
                     </span>
                     <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => updateItemField(item.id, 'isOffered', !item.isOffered)}
-                        className={cn('rounded p-1', item.isOffered ? 'text-forest' : 'text-sand hover:text-muted')}
-                        title={item.isOffered ? 'Retirer l’offre' : 'Marquer comme offert'}
-                      >
-                        <Gift size={14} />
-                      </button>
-                      <button
-                        onClick={() => setPendingDeleteItemId(item.id)}
-                        className="opacity-0 group-hover:opacity-100 rounded p-1 text-sand hover:text-coral transition-all"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {!isLocked && (
+                        <>
+                          <button
+                            onClick={() => updateItemField(item.id, 'isOffered', !item.isOffered)}
+                            className={cn('rounded p-1', item.isOffered ? 'text-forest' : 'text-sand hover:text-muted')}
+                            title={item.isOffered ? 'Retirer l’offre' : 'Marquer comme offert'}
+                          >
+                            <Gift size={14} />
+                          </button>
+                          <button
+                            onClick={() => setPendingDeleteItemId(item.id)}
+                            className="opacity-0 group-hover:opacity-100 rounded p-1 text-sand hover:text-coral transition-all"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -382,9 +467,37 @@ export function ProjectDetailPage() {
               </div>
             </div>
 
-            {project.delivery_date && (
-              <div className="mt-4 text-xs text-muted">
-                Livraison : {fmtDate(project.delivery_date)}
+            {/* Échéances : afficher événement ET livraison (cf. audit E3) */}
+            {(project.event_date || project.delivery_date) && (
+              <div className="mt-4 space-y-1 border-t border-sand/40 pt-3 text-xs text-muted">
+                {project.event_date && (
+                  <div className="flex items-center gap-1.5">
+                    <Calendar size={12} className="text-gold-dark" />
+                    <span>Événement&nbsp;: <span className="font-medium text-bark">{fmtDate(project.event_date)}</span></span>
+                  </div>
+                )}
+                {project.delivery_date && (
+                  <div className="flex items-center gap-1.5">
+                    <Calendar size={12} className="text-navy" />
+                    <span>Livraison&nbsp;: <span className="font-medium text-bark">{fmtDate(project.delivery_date)}</span></span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Action d'acceptation : disponible tant que le devis n'est pas verrouillé */}
+            {quote && !isLocked && items.length > 0 && (
+              <div className="mt-4 border-t border-sand/40 pt-4">
+                <Button
+                  variant="primary"
+                  className="w-full"
+                  onClick={() => setPendingAccept(true)}
+                >
+                  <Lock size={14} /> Marquer accepté · verrouiller le prix
+                </Button>
+                <p className="mt-2 text-[11px] text-muted text-center">
+                  Le prix sera figé. Toute modification ultérieure nécessitera une nouvelle version.
+                </p>
               </div>
             )}
           </Card>
@@ -442,6 +555,15 @@ export function ProjectDetailPage() {
         message="Cette ligne sera retirée du devis."
         confirmLabel="Supprimer"
         danger
+      />
+
+      <ConfirmDialog
+        open={pendingAccept}
+        onClose={() => setPendingAccept(false)}
+        onConfirm={markAccepted}
+        title="Verrouiller ce devis ?"
+        message={`Le prix de ${fmtCurrency(quoteTotal)} sera figé. Toute modification ultérieure nécessitera la création d'une nouvelle version du devis.`}
+        confirmLabel="Marquer accepté"
       />
     </div>
   )

@@ -11,9 +11,9 @@ import { Modal } from '@/components/ui/modal'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useToast } from '@/components/ui/toast'
-import { fmtCurrency, cn, safeFloat } from '@/lib/utils'
+import { fmtCurrency, cn, safeFloat, REVENUE_TYPES } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
-import type { Category, Article } from '@/types/database'
+import type { Category, Article, RevenueType } from '@/types/database'
 
 interface CatalogPageProps {
   categories: Category[]
@@ -26,12 +26,12 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
   const { toast } = useToast()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [editingCat, setEditingCat] = useState<{ id: string; name: string } | null>(null)
-  const [editingArt, setEditingArt] = useState<{ id: string; name: string; price: string } | null>(null)
+  const [editingArt, setEditingArt] = useState<{ id: string; name: string; price: string; revenueType: RevenueType | '' } | null>(null)
 
   // Modale d'ajout de catégorie / sous-catégorie (parentId null => catégorie racine)
   const [catModal, setCatModal] = useState<{ parentId: string | null; name: string } | null>(null)
   // Modale d'ajout d'article (rattaché à une catégorie)
-  const [artModal, setArtModal] = useState<{ catId: string; name: string; price: string } | null>(null)
+  const [artModal, setArtModal] = useState<{ catId: string; name: string; price: string; revenueType: RevenueType | '' } | null>(null)
   // Confirmation de suppression d'une catégorie
   const [deletingCatId, setDeletingCatId] = useState<string | null>(null)
 
@@ -56,7 +56,13 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
 
   const submitArticle = useCallback(async () => {
     if (!artModal || !artModal.name.trim()) return
-    const { data, error } = await supabase.from('articles').insert({ category_id: artModal.catId, name: artModal.name.trim(), price: safeFloat(artModal.price), note: null }).select().single()
+    const { data, error } = await supabase.from('articles').insert({
+      category_id: artModal.catId,
+      name: artModal.name.trim(),
+      price: safeFloat(artModal.price),
+      note: null,
+      revenue_type: artModal.revenueType || null,
+    }).select().single()
     if (error || !data) { toast('Échec de l’ajout de l’article : ' + (error?.message ?? 'inconnu'), 'error'); return }
     onUpdateArticles([...articles, data as Article])
     setArtModal(null)
@@ -94,8 +100,9 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
   const saveArtEdit = useCallback(async () => {
     if (!editingArt || !editingArt.name.trim()) return
     const newPrice = safeFloat(editingArt.price)
-    onUpdateArticles(articles.map(a => a.id === editingArt.id ? { ...a, name: editingArt.name.trim(), price: newPrice } : a))
-    const { error } = await supabase.from('articles').update({ name: editingArt.name.trim(), price: newPrice }).eq('id', editingArt.id)
+    const newRevenueType = editingArt.revenueType || null
+    onUpdateArticles(articles.map(a => a.id === editingArt.id ? { ...a, name: editingArt.name.trim(), price: newPrice, revenue_type: newRevenueType } : a))
+    const { error } = await supabase.from('articles').update({ name: editingArt.name.trim(), price: newPrice, revenue_type: newRevenueType }).eq('id', editingArt.id)
     if (error) toast('Échec de la mise à jour : ' + error.message, 'error')
     else toast('Article mis à jour')
     setEditingArt(null)
@@ -161,7 +168,7 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
                   </button>
                 )}
                 <button
-                  onClick={e => { e.stopPropagation(); setArtModal({ catId: cat.id, name: '', price: '' }) }}
+                  onClick={e => { e.stopPropagation(); setArtModal({ catId: cat.id, name: '', price: '', revenueType: '' }) }}
                   className="rounded p-1 text-sand hover:text-forest"
                   title="Ajouter un article"
                 >
@@ -199,6 +206,17 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
                         className="flex-1 rounded border border-gold-dark bg-white px-2 py-1 text-xs focus:outline-none"
                         autoFocus
                       />
+                      <select
+                        value={editingArt.revenueType}
+                        onChange={e => setEditingArt({ ...editingArt, revenueType: e.target.value as RevenueType | '' })}
+                        className="rounded border border-gold-dark bg-white px-1 py-1 text-[11px] focus:outline-none"
+                        title="Type de revenu"
+                      >
+                        <option value="">—</option>
+                        {(Object.keys(REVENUE_TYPES) as RevenueType[]).map(rt => (
+                          <option key={rt} value={rt}>{REVENUE_TYPES[rt].short}</option>
+                        ))}
+                      </select>
                       <input
                         value={editingArt.price}
                         onChange={e => setEditingArt({ ...editingArt, price: e.target.value })}
@@ -213,10 +231,15 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
                   ) : (
                     <>
                       <span className="flex-1 text-xs text-muted">{art.name}</span>
+                      {art.revenue_type && (
+                        <span className="rounded-full bg-cream-dark px-1.5 py-0.5 text-[10px] font-medium text-gold-dark">
+                          {REVENUE_TYPES[art.revenue_type].short}
+                        </span>
+                      )}
                       <span className="text-xs font-semibold text-bark">{fmtCurrency(art.price)}</span>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
                         <button
-                          onClick={() => setEditingArt({ id: art.id, name: art.name, price: String(art.price) })}
+                          onClick={() => setEditingArt({ id: art.id, name: art.name, price: String(art.price), revenueType: art.revenue_type ?? '' })}
                           className="rounded p-1 text-sand hover:text-bark"
                           title="Modifier l’article"
                         >
@@ -313,6 +336,19 @@ export function CatalogPage({ categories, articles, onUpdateCategories, onUpdate
             onKeyDown={e => { if (e.key === 'Enter') submitArticle() }}
             placeholder="0"
           />
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">Type de revenu</label>
+            <select
+              value={artModal?.revenueType ?? ''}
+              onChange={e => setArtModal(m => m && { ...m, revenueType: e.target.value as RevenueType | '' })}
+              className="w-full rounded-xl border border-sand bg-white px-3 py-2.5 text-sm focus:border-gold-dark focus:outline-none"
+            >
+              <option value="">— non défini —</option>
+              {(Object.keys(REVENUE_TYPES) as RevenueType[]).map(rt => (
+                <option key={rt} value={rt}>{REVENUE_TYPES[rt].label}</option>
+              ))}
+            </select>
+          </div>
           <div className="flex gap-3 justify-end pt-2">
             <Button variant="ghost" onClick={() => setArtModal(null)}>Annuler</Button>
             <Button variant="primary" onClick={submitArticle}>Ajouter</Button>

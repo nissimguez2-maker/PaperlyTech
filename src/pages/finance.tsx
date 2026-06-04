@@ -6,9 +6,9 @@ import {
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/toast'
-import { fmtCurrency, fmtMonth, fmtDate, cn, PAYMENT_METHODS } from '@/lib/utils'
+import { fmtCurrency, fmtMonth, fmtDate, cn, PAYMENT_METHODS, REVENUE_TYPES } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
-import type { Payment, Expense, Project } from '@/types/database'
+import type { Payment, Expense, Project, RevenueType } from '@/types/database'
 
 export function FinancePage() {
   const { toast } = useToast()
@@ -16,21 +16,37 @@ export function FinancePage() {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [quotes, setQuotes] = useState<{ project_id: string; total: number }[]>([])
+  const [revenueByType, setRevenueByType] = useState<Record<RevenueType | 'unset', number>>(
+    { print: 0, digital: 0, original: 0, unset: 0 }
+  )
   const [loading, setLoading] = useState(true)
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     async function load() {
-      const [payRes, expRes, projRes, quoteRes] = await Promise.all([
+      const [payRes, expRes, projRes, quoteRes, revRes] = await Promise.all([
         supabase.from('payments').select('*').order('date', { ascending: false }),
         supabase.from('expenses').select('*').order('date', { ascending: false }),
         supabase.from('projects').select('*, client:clients(name)'),
         supabase.from('quotes').select('project_id, total').order('version', { ascending: false }),
+        // CA par activité : agrégation au niveau ligne (un devis peut mélanger print/digital/original)
+        supabase
+          .from('quote_items')
+          .select('revenue_type, quantity, unit_price, is_offered, quotes!inner(status)')
+          .eq('quotes.status', 'accepted'),
       ])
       setPayments(payRes.data ?? [])
       setExpenses(expRes.data ?? [])
       setProjects(projRes.data ?? [])
       setQuotes(quoteRes.data ?? [])
+
+      const rev: Record<RevenueType | 'unset', number> = { print: 0, digital: 0, original: 0, unset: 0 }
+      for (const row of (revRes.data ?? []) as Array<{ revenue_type: RevenueType | null; quantity: number; unit_price: number; is_offered: boolean }>) {
+        if (row.is_offered) continue
+        const key: RevenueType | 'unset' = row.revenue_type ?? 'unset'
+        rev[key] += row.quantity * row.unit_price
+      }
+      setRevenueByType(rev)
       setLoading(false)
     }
     load()
@@ -255,6 +271,51 @@ export function FinancePage() {
                 <p className="py-4 text-center text-xs text-muted">Aucun paiement pour le moment</p>
               )}
             </div>
+          </Card>
+
+          {/* CA par activité (lignes de devis acceptés, mixte print/digital/original) */}
+          <Card className="mt-6">
+            <CardTitle>CA par activité</CardTitle>
+            {(() => {
+              const totalRev = revenueByType.print + revenueByType.digital + revenueByType.original + revenueByType.unset
+              if (totalRev === 0) {
+                return <p className="mt-4 py-4 text-center text-xs text-muted">Aucun devis accepté pour le moment</p>
+              }
+              const rows: Array<{ key: RevenueType | 'unset'; label: string; amount: number }> = [
+                { key: 'print',    label: REVENUE_TYPES.print.label,    amount: revenueByType.print },
+                { key: 'digital',  label: REVENUE_TYPES.digital.label,  amount: revenueByType.digital },
+                { key: 'original', label: REVENUE_TYPES.original.label, amount: revenueByType.original },
+              ]
+              if (revenueByType.unset > 0) rows.push({ key: 'unset', label: 'Non classé', amount: revenueByType.unset })
+              return (
+                <div className="mt-4 space-y-3">
+                  {rows.map(({ key, label, amount }) => {
+                    const pct = totalRev > 0 ? (amount / totalRev) * 100 : 0
+                    return (
+                      <div key={key}>
+                        <div className="mb-1 flex justify-between text-xs">
+                          <span className="font-medium text-bark">{label}</span>
+                          <span className="text-muted">{pct.toFixed(0)}%</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-cream-dark">
+                          <div
+                            className={cn(
+                              'h-full rounded-full transition-all duration-500',
+                              key === 'print'    && 'bg-navy',
+                              key === 'digital'  && 'bg-gold-dark',
+                              key === 'original' && 'bg-forest',
+                              key === 'unset'    && 'bg-sand',
+                            )}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <p className="mt-0.5 text-right text-xs text-muted">{fmtCurrency(amount)}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
           </Card>
 
           {/* Sumit tracker */}

@@ -117,7 +117,20 @@ export function ProjectsPage() {
   }, [projects, toast, loadProjects])
 
   const deleteProject = useCallback(async (projectId: string) => {
-    // Cascade delete: quote_items -> quotes -> tasks -> payments -> project
+    // Garde-fou : ne pas détruire un projet avec paiements encaissés (preuve comptable)
+    // — la FK payments → projects est en ON DELETE RESTRICT depuis la migration 004.
+    const { count: payCount } = await supabase
+      .from('payments')
+      .select('id', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+    if ((payCount ?? 0) > 0) {
+      toast('Ce projet a des paiements enregistrés et ne peut pas être supprimé.', 'error')
+      setDeletingId(null)
+      return
+    }
+
+    // Cascade applicative pour les données dépendantes non protégées :
+    // quote_items (verrou si devis locked) → quotes → tasks → project.
     const { data: quotes } = await supabase.from('quotes').select('id').eq('project_id', projectId)
     const quoteIds = (quotes ?? []).map(q => q.id)
     if (quoteIds.length > 0) {
@@ -125,7 +138,6 @@ export function ProjectsPage() {
       await supabase.from('quotes').delete().in('id', quoteIds)
     }
     await supabase.from('tasks').delete().eq('project_id', projectId)
-    await supabase.from('payments').delete().eq('project_id', projectId)
     const { error } = await supabase.from('projects').delete().eq('id', projectId)
 
     if (error) {

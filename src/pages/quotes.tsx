@@ -226,19 +226,24 @@ export function QuotesPage({ categories, articles }: QuotePageProps) {
         .single()
       if (quoteErr || !quote) throw new Error('Échec de la création du devis')
 
-      // 6. Create quote items
-      const quoteItems = items.map((it, idx) => ({
-        quote_id: quote.id,
-        article_id: it.articleId || null,
-        name: it.name || 'Article',
-        description: articleOptions.find(o => o.value === it.articleId)?.label || null,
-        quantity: it.qty,
-        unit_price: safeFloat(it.unitPrice),
-        is_override: it.isOverride,
-        is_offered: it.isOffered,
-        hide_qty: it.hideQty,
-        sort_order: idx,
-      }))
+      // 6. Create quote items — snapshot revenue_type from selected article
+      // (cf. audit M8 + decision: a single order can mix print/digital/original)
+      const quoteItems = items.map((it, idx) => {
+        const art = it.articleId ? articles.find(a => a.id === it.articleId) : null
+        return {
+          quote_id: quote.id,
+          article_id: it.articleId || null,
+          name: it.name || 'Article',
+          description: articleOptions.find(o => o.value === it.articleId)?.label || null,
+          quantity: it.qty,
+          unit_price: safeFloat(it.unitPrice),
+          is_override: it.isOverride,
+          is_offered: it.isOffered,
+          hide_qty: it.hideQty,
+          sort_order: idx,
+          revenue_type: art?.revenue_type ?? null,
+        }
+      })
       const { error: itemsErr } = await supabase.from('quote_items').insert(quoteItems)
       if (itemsErr) throw new Error('Échec de la création des lignes du devis')
 
