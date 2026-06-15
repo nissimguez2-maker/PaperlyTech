@@ -309,3 +309,54 @@ Two clearly separated offerings. The site must make the choice obvious from the 
 | 5 | Save-the-Date — Digital | *(price hidden)* | — | instant download | template render (placeholder) |
 
 Product description pattern (item 1): _"A ready-made menu card from the Paperly Collection — editorial design, printed and finished in studio. Priced per piece; minimum order applies. Want it designed bespoke, around your event's world? Begin a conversation on WhatsApp."_
+
+---
+
+## 15. Commerce rebalance — "fewer pictures, more e-commerce" (2nd 5-agent panel)
+
+Owner feedback on the first generated site: **too image-heavy (reads as a lookbook), not enough e-commerce.** Unanimous agent diagnosis: *"a beautiful gallery with the shop hidden in the back room."*
+
+### Image-density budget (UI/UX) — Must
+- **1 full-bleed hero per page**, ≤ 62vh desktop / 48vh mobile. Shop & product pages: **0** full-bleed (typographic header band instead).
+- **No two image sections adjacent** — every image block separated by a text/commerce/data module.
+- Target **≤35% image / ≥65% content** on Home and The Collection.
+- **Quarantine the lookbook in Portfolio**; cap each universe gallery at **~6 images** + a typographic story block.
+- Convert decorative photo strips → typographic dividers, USP strips, shop-by-category bands.
+
+### Homepage section order (commerce-forward) — Must
+1. ONE bespoke hero (≤62vh) + dual CTA: *Explore Bespoke* / *Shop The Collection*.
+2. Two-door chooser (Bespoke vs The Collection).
+3. **★ Shoppable product module** — 3–4 product cards with **₪ price + Add-to-Cart**, "View all →". (The single highest-impact fix.)
+4. Value/USP strip (made in Israel · ships in X days · premium stock) — no photos.
+5. Contained bespoke teaser (3-image strip) → Portfolio.
+6. Social proof / planners band.
+7. Contact (WhatsApp + Instagram).
+
+### Navigation & store anatomy — Must
+- **"The Collection" promoted to primary nav** (slot #2) with category sub-pages; **persistent header cart** with item count on every page.
+- The Collection page: slim title band (no hero) → category pills → sort → **product grid (3/2/2 cols)** with price + quick-add → what's-included → fulfillment info.
+- Product page: ≤3–4 gallery images, prominent ₪ price, **pack-size variant selector**, what's-included, dimensions, fulfillment + lead time, Add-to-Cart (sticky on mobile), cross-sell, "← back to The Collection".
+
+### Pricing presentation — set/pack, not per-piece (Pricing Analyst) — DECISION NEEDED
+A ₪4–5 per-piece price looks cheap and caps AOV. Recommendation: sell **fixed sets as Wix variants** (minimum enforced by smallest variant), round premium numbers. Indicative (to be confirmed against the real Supabase grid + true costs):
+
+| Product | Variants (pack → price) |
+|---|---|
+| Menu | 25 → ₪220 · 50 → ₪390 · 100 → ₪690 |
+| Place Card (Folded/Round as option) | 50 → ₪260 · 100 → ₪460 (min 50) |
+| Welcome / Statement sign | 1 → ₪290 |
+
+Bundles (AOV lever, one art direction across pieces): **The Table** (50 menu + 50 place cards) ₪590 · **The Setting** (+ sign) ₪850 · **The Full Universe** ₪1,200. Present savings as "designed to go together," not a discount. Anchor the grid with the most premium item; **no sort-by-price, no discount badges, no per-piece math shown**.
+
+> ⚠️ These set prices were modelled by the agent with margin assumptions and **deviate from the raw Supabase per-piece grid** — they must be confirmed by Nessim before publishing.
+
+### Store depth & trust (E-commerce) — Should
+- Expand to **~8–10 SKUs** grouped into **job-based categories**: *The Table* (menu, place cards, table number, napkin band), *The Welcome* (welcome/seating sign, save-the-date), *The Invitation Suite* (invitation, RSVP, thank-you). Never show a category with <3 items.
+- Hero **"Complete Table Set"** bundle + "Studio favourite" badge + manual curated ordering.
+- Israeli checkout: cards + **תשלומים (installments)** + **Bit**, Apple/Google Pay; **guest checkout ON**; ILS tax-inclusive display; clear shipping/pickup/download + lead times; policy pages (personalised = final sale).
+- **Template → bespoke bridge:** soft upsell on product pages + post-purchase ("your full event could have its own universe"); optional "template credit toward a bespoke commission."
+
+### Implementation reality (confirmed this session)
+- **Stores V3 API works** (via token) → products, variants, pack pricing, categories, bundles, cross-sell are all doable programmatically.
+- **Builder re-run with an existing job ID is a no-op** → page layout/image changes must be done in the **Wix editor** (or a fresh generate), not via the builder API.
+- `CallWixSiteAPI` / doc-search remain approval-gated in the web session.
