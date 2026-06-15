@@ -253,3 +253,59 @@ The Studio (first person, ~150 words):
 3. **Real project photos** — at least one full "visual universe" to make the showcase convincing at launch.
 4. **The 5–10 Collection items** — name · description · price (₪) · size · fulfillment.
 5. Real **testimonials** if available (else a signed Sacha note).
+
+---
+
+## 13. Core differentiation — Universes vs The Collection
+
+Two clearly separated offerings. The site must make the choice obvious from the homepage.
+
+**A. Universes (bespoke) — the hero offering**
+- _"We create a complete world for your event."_ Full artistic direction; every piece designed around one vision.
+- Lives in **Portfolio** as case studies (e.g. **Chloé & Albert**).
+- Sold by **conversation** → WhatsApp / Instagram. **No prices.**
+- For clients who want something singular and grandiose.
+
+**B. The Collection (templates) — the accessible path**
+- _"Beautiful, ready-made pieces from our templates."_ Editorial design, no bespoke art direction.
+- Lives in **The Collection**; **bought directly** with real ₪ prices.
+- For clients who don't want something grandiose, or have a tighter budget.
+- **Generic product names — never attributed to a specific client or event.**
+
+**Messaging rule:** present both paths side by side on Home + How It Works — *"A world of your own"* (bespoke) vs *"From our Collection"* (templates). The bespoke universe is the aspiration; the Collection is the on-ramp that captures budget-conscious clients instead of losing them — and can upsell toward a full universe later.
+
+**Asset rule:** bespoke work (the Chloé & Albert photos) appears ONLY in the universe/portfolio — **never** as a Collection product image.
+
+---
+
+## 14. Editor build playbook (manual, until the Wix API is unblocked)
+
+> `CallWixSiteAPI` (create products / edit page content) is gated by an approval prompt that does not clear in this remote session — so the items below are paste-ready for the Wix editor. Image uploads already worked; the three assets are in the media library.
+
+### Uploaded media (already in the Wix media library)
+| Asset | Use | URL |
+|---|---|---|
+| Greens / pop-art | Universe + signage visuals | `static.wixstatic.com/media/678de3_77c2380e591b48778871f1505a5c64e7~mv2.jpg` |
+| Chloé & Albert table + menus | Universe hero | `static.wixstatic.com/media/678de3_3c0a2e2a5dff4eabbbf622d20a312472~mv2.jpg` |
+| Round place cards | Universe detail | `static.wixstatic.com/media/678de3_ab16d720401e495a91458ae8acd653b5~mv2.jpg` |
+
+### Portfolio → Universe (bespoke): "Chloé & Albert"
+- **Title:** Chloé & Albert — A wedding in deep green
+- **The Brief:** A green-toned celebration with candlelight, warmth, and a quiet touch of pop-art imagination.
+- **The Direction:** Deep green as the whole language of the evening — every surface chosen to sit naturally within candlelight.
+- **The System:** Palette — deep green, candle-gold; Materials — warm stock; Motif — botanical; Pieces — custom menus + round place cards.
+- **The Pieces:** Custom menus, personalised round place cards.
+- **The Feeling:** A table that looked like it had always belonged to them.
+- **CTA:** "Create your own universe →" (WhatsApp). **No price.**
+- **Images:** all three uploaded assets.
+
+### The Collection → 5 template products (generic, no client names)
+| # | Name | Price | Cut / size | Fulfillment | Photo |
+|---|---|---|---|---|---|
+| 1 | Menu Card | ₪5 / piece | rectangle, size 2 (A3) | courier / pickup | template render (placeholder) |
+| 2 | Folded Place Card | ₪4 / piece | rectangle, size 4 | courier / pickup | template render (placeholder) |
+| 3 | Round Place Card | ₪4 / piece | shape, size 6 | courier / pickup | template render (placeholder) |
+| 4 | Welcome Sign | *(price hidden / by request)* | — | — | template render (placeholder) |
+| 5 | Save-the-Date — Digital | *(price hidden)* | — | instant download | template render (placeholder) |
+
+Product description pattern (item 1): _"A ready-made menu card from the Paperly Collection — editorial design, printed and finished in studio. Priced per piece; minimum order applies. Want it designed bespoke, around your event's world? Begin a conversation on WhatsApp."_
